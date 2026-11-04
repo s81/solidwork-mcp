@@ -25,6 +25,8 @@ public class McpProtocolTests
     {
         await using var client = await StartAsync();
         Assert.Equal("solidworks-mcp", client.ServerInfo?.Name);
+        Assert.Equal(ServerVersion.Current, client.ServerInfo?.Version);
+        Assert.Matches(@"^\d+\.\d+\.\d+", client.ServerInfo?.Version ?? string.Empty);
         Assert.Contains("millimetres", client.ServerInstructions ?? string.Empty);
 
         var tools = await client.ListToolsAsync();

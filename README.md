@@ -24,7 +24,7 @@ Windows builds are on the [Releases](https://github.com/s81/solidwork-mcp/releas
 
 Unzip it to e.g. `C:\Tools\solidworks-mcp` and follow [`docs/INSTALL.md`](docs/INSTALL.md), which is also in the zip.
 
-To make a release, push a tag such as `v0.2.0`, or run the **Release** workflow by hand with a version and `publish` ticked, which creates the tag itself. [`release.yml`](.github/workflows/release.yml) then tests, packages (`build/package.ps1`) and smoke-tests both zips on Windows (`build/smoke-test.ps1`), and publishes the GitHub Release.
+To make a release, first set `<Version>` in `src/SolidWorksMcp/SolidWorksMcp.csproj` (the server reports it to clients, and the release run checks they match). Then push a tag such as `v0.2.0`, or run the **Release** workflow by hand with a version and `publish` ticked, which creates the tag itself. [`release.yml`](.github/workflows/release.yml) then tests, packages (`build/package.ps1`) and smoke-tests both zips on Windows (`build/smoke-test.ps1`), and publishes the GitHub Release.
 
 ## Build & install
 

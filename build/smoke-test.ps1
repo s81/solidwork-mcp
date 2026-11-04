@@ -5,7 +5,8 @@
 #>
 param(
     [Parameter(Mandatory = $true)][string]$Exe,
-    [int]$MinTools = 81
+    [int]$MinTools = 81,
+    [string]$ExpectedVersion
 )
 $ErrorActionPreference = 'Stop'
 $psi = [System.Diagnostics.ProcessStartInfo]::new($Exe)
@@ -26,7 +27,12 @@ try {
         $read = $p.StandardOutput.ReadLineAsync()
         if (-not $read.Wait(60000) -or $null -eq $read.Result) { break }
         $msg = $read.Result | ConvertFrom-Json
-        if ($msg.id -eq 1) { Write-Host "initialize: $($msg.result.serverInfo.name) $($msg.result.serverInfo.version)" }
+        if ($msg.id -eq 1) {
+            Write-Host "initialize: $($msg.result.serverInfo.name) $($msg.result.serverInfo.version)"
+            if ($ExpectedVersion -and $msg.result.serverInfo.version -ne $ExpectedVersion) {
+                throw "Server reports version $($msg.result.serverInfo.version), expected $ExpectedVersion."
+            }
+        }
         if ($msg.id -eq 2) { $tools = $msg.result.tools }
     }
     if (-not $tools) { throw "No tools/list response from $Exe. stderr: $($p.StandardError.ReadToEnd())" }

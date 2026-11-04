@@ -13,7 +13,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>SolidWorksMcp</AssemblyName>
     <RootNamespace>SolidWorksMcp</RootNamespace>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Authors>Samer William Al-Haddadin</Authors>
     <Copyright>Copyright (c) 2026 Samer William Al-Haddadin</Copyright>
     <Product>SolidWorks MCP Server</Product>
