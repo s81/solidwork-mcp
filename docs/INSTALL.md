@@ -1,6 +1,6 @@
 # SolidWorks MCP Server — Install Guide (Windows)
 
-This package lets Claude (Claude Desktop, Claude Code or any MCP client) drive **SolidWorks 2022 or newer** on this PC: open, save and export files, read and write properties, build BOMs, model parts, and make drawings with dimensions, balloons, BOM tables and revision tables. `README.md` lists all 81 tools.
+This package lets Claude (Claude Desktop, Claude Code or any MCP client) drive **SolidWorks 2022 or newer** on this PC: open, save and export files, read and write properties, build BOMs, model parts, and make drawings with section and detail views, dimensions, balloons, BOM tables and revision tables. `README.md` lists all 84 tools.
 
 > **Status:** compiled against the SolidWorks 2022 SP5 API and covered by automated tests, but **not yet validated against a live SolidWorks session**. Try it on a test workstation with copies of your files before using it on production data.
 

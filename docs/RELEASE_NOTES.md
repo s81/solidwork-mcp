@@ -1,4 +1,4 @@
-SolidWorks MCP server for **SolidWorks 2022 or newer** on Windows x64: 81 tools over stdio, built with .NET 8 and the official MCP C# SDK.
+SolidWorks MCP server for **SolidWorks 2022 or newer** on Windows x64: 84 tools over stdio, built with .NET 8 and the official MCP C# SDK.
 
 ## What's new in 0.1.2
 

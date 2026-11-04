@@ -1,14 +1,14 @@
 # Hand-off — SolidWorks MCP server
 
-Last updated **2026-11-04**, after release **v0.1.2** (main at `576ea03`). This is for the next session, which adds features.
+Last updated **2026-11-04**: release **v0.1.2** plus unreleased section and detail views. This is for the next session, which adds features.
 Working rules are in [`CLAUDE.md`](../CLAUDE.md).
 
 ## 1. Where things stand
 
 | Item | State |
 |---|---|
-| Tools | **81**, in 18 groups (§3) |
-| Tests | **415** passing (`dotnet test`, Linux and Windows CI) |
+| Tools | **84**, in 19 groups (§3) |
+| Tests | **455** passing (`dotnet test`, Linux and Windows CI) |
 | Latest release | **v0.1.2**: unsigned, win-x64, self-contained (~32 MB) and framework-dependent (~2.8 MB) zips, `SHA256SUMS.txt` |
 | Older releases | v0.1.1 and v0.1.0 are marked "superseded" and pre-release |
 | Open PRs | none |
@@ -41,7 +41,7 @@ build/                       package.ps1 (zips + optional signing), smoke-test.p
 docs/                        INSTALL.md (goes in the zip), RELEASE_NOTES.md (release body), HANDOFF.md
 ```
 
-## 3. Tool inventory (81)
+## 3. Tool inventory (84)
 
 | File | Tools |
 |---|---|
@@ -58,6 +58,7 @@ docs/                        INSTALL.md (goes in the zip), RELEASE_NOTES.md (rel
 | WeldmentTools | sw_list_weldment_profiles, sw_add_structural_member, sw_get_weldment_cut_list, sw_trim_extend, sw_add_end_cap, sw_add_gusset |
 | EquationTools | sw_list_equations, sw_set_global_variable, sw_add_equation, sw_delete_equation |
 | DrawingTools | sw_create_drawing, sw_list_drawing_sheets, sw_activate_sheet |
+| SectionDetailViewTools | sw_add_section_view, sw_add_detail_view, sw_list_section_detail_views |
 | DrawingDimensionTools | sw_insert_model_dimensions, sw_list_drawing_dimensions, sw_auto_dimension_view, sw_add_drawing_dimension |
 | BomTableTools | sw_insert_bom_table, sw_read_bom_tables, sw_export_bom_table, sw_renumber_bom_items |
 | BalloonTools | sw_auto_balloon, sw_list_balloons, sw_add_balloon, sw_add_stacked_balloon, sw_edit_balloons, sw_delete_balloons, sw_add_magnetic_line |
@@ -73,10 +74,11 @@ docs/                        INSTALL.md (goes in the zip), RELEASE_NOTES.md (rel
    the document type, convert units, return a record, and make `McpException` messages say what to call next.
 5. Update **all** tool-count and catalogue references (CI fails or the docs go stale otherwise):
    - `tests/SolidWorksMcp.Tests/ToolCatalogTests.cs`: add the names to the `HasExpectedToolGroups` list
-   - `build/smoke-test.ps1`: `[int]$MinTools = 81` default
-   - `README.md`: `## Tools (81)` heading and the group table row
-   - `docs/INSTALL.md` line 3 ("lists all 81 tools")
-   - `docs/RELEASE_NOTES.md` line 1 ("81 tools") plus a "What's new" entry at release time
+   - `tests/SolidWorksMcp.Tests/McpProtocolTests.cs`: `tools.Count >= N`
+   - `build/smoke-test.ps1`: `[int]$MinTools = …` default
+   - `README.md`: `## Tools (N)` heading and the group table row
+   - `docs/INSTALL.md` line 3 ("lists all N tools")
+   - `docs/RELEASE_NOTES.md` line 1 ("N tools") plus a "What's new" entry at release time
    - `src/SolidWorksMcp/ServerInstructions.cs`: a usage hint if the tool has an order or prerequisites
 6. Add argument-validation cases to `McpProtocolTests` (bad enum / out-of-range values must return a clear error).
 7. `dotnet test`, commit, push, open a draft PR (process in CLAUDE.md).
@@ -114,7 +116,7 @@ Ask the user to pick and order these. They are grouped by fit with the group's w
 
 | Area | Candidate tools | Why it may matter |
 |---|---|---|
-| Drawing views | section, detail, projected, auxiliary, broken views; view scale/display style | Fabrication drawings need more than the standard 3 views |
+| Drawing views | projected, auxiliary, broken views; half / offset sections; edit section/detail views; view scale/display style (section + detail views: done) | Fabrication drawings need more than the standard 3 views |
 | Annotations | notes, centre marks / centrelines, surface finish, weld symbols, GD&T / datum, hole table | Shop drawings for steel / welded frames |
 | Title block | fill sheet-format properties from custom properties; sheet size/format change | Consistent drawing release |
 | Patterns & features | linear / circular pattern, mirror, shell, reference plane / axis, sweep, loft | Common modelling gaps today |

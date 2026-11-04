@@ -30,7 +30,7 @@ public class McpProtocolTests
         Assert.Contains("millimetres", client.ServerInstructions ?? string.Empty);
 
         var tools = await client.ListToolsAsync();
-        Assert.True(tools.Count >= 81, $"only {tools.Count} tools");
+        Assert.True(tools.Count >= 84, $"only {tools.Count} tools");
         var sketch = tools.Single(t => t.Name == "sw_create_sketch");
         string schema = sketch.JsonSchema.GetRawText();
         Assert.Contains("\"entities\"", schema);
@@ -127,6 +127,38 @@ public class McpProtocolTests
         var result = await client.CallToolAsync(tool, args);
         Assert.True(result.IsError);
         Assert.Contains(expected, Text(result));
+    }
+
+    [Theory]
+    [InlineData("sw_add_section_view", "orientation", "diagonal", "Unknown orientation")]
+    [InlineData("sw_add_section_view", "orientation", "angled", "requires angleDeg")]
+    [InlineData("sw_add_detail_view", "style", "fancy", "Unknown detail style")]
+    [InlineData("sw_add_detail_view", "circleDisplay", "square", "Unknown circleDisplay")]
+    [InlineData("sw_add_detail_view", "scale", "0:1", "must look like 2:1")]
+    public async Task SectionDetailToolsValidateBeforeTouchingSolidWorks(string tool, string arg, string value, string expected)
+    {
+        await using var client = await StartAsync();
+        var args = new Dictionary<string, object?>
+        {
+            ["view"] = "Drawing View1", ["throughMm"] = new[] { 100.0, 100 }, ["centerMm"] = new[] { 100.0, 100 }, ["radiusMm"] = 10.0,
+        };
+        args[arg] = value;
+        var result = await client.CallToolAsync(tool, args);
+        Assert.True(result.IsError);
+        Assert.Contains(expected, Text(result));
+    }
+
+    [Theory]
+    [InlineData("sw_add_section_view", "throughMm")]
+    [InlineData("sw_add_detail_view", "centerMm")]
+    public async Task SectionDetailToolsRejectBadPoints(string tool, string pointArg)
+    {
+        await using var client = await StartAsync();
+        var args = new Dictionary<string, object?> { ["view"] = "Drawing View1", ["radiusMm"] = 10.0, ["throughMm"] = new[] { 1.0, 2 }, ["centerMm"] = new[] { 1.0, 2 } };
+        args[pointArg] = new[] { 1.0, 2, 3 };
+        var result = await client.CallToolAsync(tool, args);
+        Assert.True(result.IsError);
+        Assert.Contains("must be [x, y] in mm", Text(result));
     }
 
     [Theory]
