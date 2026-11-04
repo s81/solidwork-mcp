@@ -15,3 +15,43 @@ jobs:
           dotnet-version: 8.0.x
       - run: dotnet build -c Release
       - run: dotnet test -c Release --no-build --logger "console;verbosity=normal"
+  package-signed:
+    # Exercises build/package.ps1's signing path with a throwaway self-signed certificate,
+    # so a broken signing step shows up on the PR instead of during a release.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+      - name: Throwaway signing certificate
+        shell: pwsh
+        run: |
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=SolidWorks MCP CI test' `
+            -KeyAlgorithm RSA -KeyLength 3072 -HashAlgorithm SHA256 -KeyExportPolicy Exportable `
+            -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddDays(2)
+          $pw = [guid]::NewGuid().ToString()
+          $path = Join-Path $env:RUNNER_TEMP 'ci-signing.pfx'
+          Export-PfxCertificate -Cert $cert -FilePath $path -Password (ConvertTo-SecureString $pw -AsPlainText -Force) | Out-Null
+          Remove-Item "Cert:\CurrentUser\My\$($cert.Thumbprint)" -DeleteKey
+          "::add-mask::$pw"
+          "SIGNING_CERT_PATH=$path" >> $env:GITHUB_ENV
+          "SIGNING_CERT_PASSWORD=$pw" >> $env:GITHUB_ENV
+          "EXPECTED_THUMBPRINT=$($cert.Thumbprint)" >> $env:GITHUB_ENV
+      - name: Package (signed)
+        shell: pwsh
+        run: ./build/package.ps1 -Version 0.0.0-ci -SigningCertPath $env:SIGNING_CERT_PATH -TrustOnThisMachine
+      - name: Verify signatures and run signed exes
+        shell: pwsh
+        run: |
+          foreach ($v in 'win-x64', 'win-x64-framework') {
+            $exe = "artifacts/solidworks-mcp-0.0.0-ci-$v/SolidWorksMcp.exe"
+            $sig = Get-AuthenticodeSignature $exe
+            if ($sig.Status -ne 'Valid') { throw "$exe signature is $($sig.Status): $($sig.StatusMessage)" }
+            if ($sig.SignerCertificate.Thumbprint -ne $env:EXPECTED_THUMBPRINT) { throw "$exe signed by an unexpected certificate." }
+            if (-not $sig.TimeStamperCertificate) { throw "$exe has no timestamp." }
+            if (-not (Test-Path "artifacts/solidworks-mcp-0.0.0-ci-$v/SolidWorksMcp-signing.cer")) { throw "zip folder for $v is missing SolidWorksMcp-signing.cer" }
+            Write-Host "$v : $($sig.Status), signer $($sig.SignerCertificate.Subject), timestamp $($sig.TimeStamperCertificate.Subject)"
+            ./build/smoke-test.ps1 -Exe $exe -ExpectedVersion 0.0.0-ci
+          }
+          if ((Get-Content artifacts/signing-thumbprint.txt -Raw) -ne $env:EXPECTED_THUMBPRINT) { throw 'signing-thumbprint.txt is wrong.' }
