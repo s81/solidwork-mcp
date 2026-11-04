@@ -28,7 +28,7 @@ public class McpProtocolTests
         Assert.Contains("millimetres", client.ServerInstructions ?? string.Empty);
 
         var tools = await client.ListToolsAsync();
-        Assert.True(tools.Count >= 45, $"only {tools.Count} tools");
+        Assert.True(tools.Count >= 48, $"only {tools.Count} tools");
         var sketch = tools.Single(t => t.Name == "sw_create_sketch");
         string schema = sketch.JsonSchema.GetRawText();
         Assert.Contains("\"entities\"", schema);
@@ -56,6 +56,19 @@ public class McpProtocolTests
         await using var client = await StartAsync();
         var args = new Dictionary<string, object?> { ["distance"] = 1.0, ["type"] = "angle_distance", [arg] = value, ["sketch"] = "Sketch1", ["selection"] = "all" };
         var result = await client.CallToolAsync(tool, args);
+        Assert.True(result.IsError);
+        Assert.Contains(expected, Text(result));
+    }
+
+    [Theory]
+    [InlineData("gear", 2, "Unsupported mate type")]
+    [InlineData("coincident", 1, "exactly two")]
+    [InlineData("coincident", 2, "only be used in a lock mate")]
+    public async Task AddMateValidatesBeforeTouchingSolidWorks(string type, int count, string expected)
+    {
+        await using var client = await StartAsync();
+        var refs = Enumerable.Range(1, count).Select(i => new Dictionary<string, object?> { ["component"] = $"Part-{i}" }).ToArray();
+        var result = await client.CallToolAsync("sw_add_mate", new Dictionary<string, object?> { ["type"] = type, ["references"] = refs });
         Assert.True(result.IsError);
         Assert.Contains(expected, Text(result));
     }
