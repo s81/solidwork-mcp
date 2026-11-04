@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "solidworks": {
+      "command": "C:\\Tools\\solidworks-mcp\\SolidWorksMcp.exe",
+      "env": {
+        "SWMCP_ALLOWED_ROOTS": "D:\\Engineering\\Projects;C:\\Exports",
+        "SWMCP_ALLOW_MACROS": "false",
+        "SWMCP_ATTACH_ONLY": "false"
+      }
+    }
+  }
+}

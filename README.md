@@ -1,0 +1,143 @@
+# SolidWorks MCP Server (.NET 8)
+
+A [Model Context Protocol](https://modelcontextprotocol.io) server that lets Claude (Claude Desktop, Claude Code, or any MCP client) drive a local **SolidWorks 2022+** installation: open/save/export files, read and write custom properties, build BOMs, sketch and extrude parts, edit dimensions and equations, create drawings, and batch-export STEP/PDF/flat-pattern DXF.
+
+Built with the official [MCP C# SDK](https://github.com/modelcontextprotocol/csharp-sdk) (`ModelContextProtocol` 2.3.1) and the SolidWorks COM API, over stdio.
+
+> **Status: v0.1.** The code compiles against the SolidWorks 2022 SP5 interop assemblies and the MCP protocol layer is covered by automated tests, but it has **not yet been run against a live SolidWorks session** in this repository's CI (no SolidWorks licence on CI runners). Validate on a test workstation with non-production files before rolling out. See [Verification](#verification).
+
+## Requirements
+
+| | |
+|---|---|
+| OS | Windows 10/11 x64 (SolidWorks is Windows-only) |
+| SolidWorks | 2022 or newer, licensed and activated on the same machine |
+| Runtime | .NET 8 runtime (or publish self-contained) |
+| Build | .NET 8 SDK |
+
+## Build & install
+
+```bash
+dotnet build -c Release
+```
+
+```bash
+dotnet publish src/SolidWorksMcp -c Release -o C:\Tools\solidworks-mcp
+```
+
+Interop resolution: if `C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\api\redist\SolidWorks.Interop.sldworks.dll` exists, the build references the DLLs from your installation (the officially supported source). Otherwise it falls back to the `SolidWorks.Interop.sldworks` / `swconst` 30.5.1 NuGet packages (2022 SP5.1). If SolidWorks is installed elsewhere:
+
+```bash
+dotnet build -c Release -p:SolidWorksApiPath="D:\SOLIDWORKS\api\redist"
+```
+
+### Register with Claude Desktop
+
+Add to `%APPDATA%\Claude\claude_desktop_config.json` (see [`examples/claude_desktop_config.json`](examples/claude_desktop_config.json)):
+
+```json
+{
+  "mcpServers": {
+    "solidworks": {
+      "command": "C:\\Tools\\solidworks-mcp\\SolidWorksMcp.exe",
+      "env": { "SWMCP_ALLOWED_ROOTS": "D:\\Engineering\\Projects;C:\\Exports" }
+    }
+  }
+}
+```
+
+### Register with Claude Code
+
+```bash
+claude mcp add solidworks -e SWMCP_ALLOWED_ROOTS="D:\Engineering\Projects" -- C:\Tools\solidworks-mcp\SolidWorksMcp.exe
+```
+
+## Configuration (environment variables)
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SWMCP_ALLOWED_ROOTS` | *(empty = no restriction)* | `;`-separated folders. Every path a tool reads or writes must be inside one. **Recommended in production.** |
+| `SWMCP_ALLOW_MACROS` | `false` | Enables `sw_run_macro`. A macro is arbitrary code, so keep this off unless needed. |
+| `SWMCP_ATTACH_ONLY` | `false` | Only attach to a running SolidWorks; never launch one. |
+| `SWMCP_VISIBLE` | `true` | Show the SolidWorks window when the server launches it. |
+| `SWMCP_STARTUP_TIMEOUT_SECONDS` | `180` | Max wait for a launched SolidWorks to finish starting. |
+| `SWMCP_COM_RETRY_TIMEOUT_SECONDS` | `60` | How long to retry calls SolidWorks rejects while busy. |
+
+## Tools (41)
+
+Conventions: lengths in **mm**, angles in **degrees**, mass in **kg**. `document` accepts a full path, file name or window title; omit it to use the active document.
+
+| Group | Tools |
+|---|---|
+| Connection | `sw_connect` |
+| Documents | `sw_list_open_documents`, `sw_get_document_info`, `sw_open_document`, `sw_new_document`, `sw_activate_document`, `sw_save_document`, `sw_save_as`, `sw_close_document`, `sw_rebuild`, `sw_screenshot` (returns an image to the model) |
+| Export | `sw_export` (STEP AP203/214/242, IGES, Parasolid, SAT, STL, 3MF, IFC, PDF, DXF/DWG, eDrawings, JPG/TIF/PNG), `sw_export_flat_pattern_dxf` (sheet metal), `sw_batch_export` (whole folder, incl. `flat-dxf`) |
+| Properties | `sw_get_custom_properties`, `sw_set_custom_property`, `sw_delete_custom_property`, `sw_get_mass_properties`, `sw_get_material`, `sw_set_material`, `sw_list_configurations`, `sw_activate_configuration` |
+| Assembly / BOM | `sw_get_component_tree`, `sw_get_bom` (`top_level` or `parts_only`, with chosen custom properties), `sw_insert_component` |
+| Modeling | `sw_create_sketch` (line, centerline, rectangles, circle, arc, polygon, slot, point), `sw_extrude`, `sw_cut_extrude`, `sw_list_features`, `sw_set_feature_suppression`, `sw_delete_feature`, `sw_list_dimensions`, `sw_set_dimension` |
+| Equations | `sw_list_equations`, `sw_set_global_variable`, `sw_add_equation`, `sw_delete_equation` |
+| Drawings | `sw_create_drawing` (1st/3rd angle, isometric, import model dimensions), `sw_list_drawing_sheets`, `sw_activate_sheet` |
+| Macros | `sw_run_macro` (disabled by default) |
+
+### Example prompts
+
+- *"Open D:\Projects\LabBench\LabBench.sldasm and give me a parts-only BOM with PartNo, Description and Material as a table."*
+- *"Export every sheet-metal part in D:\Projects\Cabinet\Parts to flat-pattern DXF in C:\Exports\Laser."*
+- *"Create a 600 × 400 × 3 mm plate on the top plane with four Ø9 mm holes 25 mm from each corner, set material AISI 304, and save it as C:\Work\plate.sldprt."*
+- *"Set global variable Width to 1500 in the desk assembly, rebuild, and report the new mass."*
+- *"Make a first-angle A3 drawing of bracket.sldprt with an isometric view and export it to PDF."*
+
+## Architecture
+
+```
+MCP client ──stdio JSON-RPC──▶ SolidWorksMcp.exe
+                                 ├─ ModelContextProtocol SDK (tool discovery, schemas, transport)
+                                 ├─ Tools/*            one class per tool group, DTO in / DTO out
+                                 ├─ SolidWorksSession  connect / attach / reconnect, error mapping
+                                 └─ StaDispatcher      single STA thread + OLE message filter
+                                                          │ COM (out-of-proc)
+                                                          ▼
+                                                     SLDWORKS.exe
+```
+
+Design decisions:
+
+- **Single STA thread.** The SolidWorks API is apartment-threaded and not re-entrant. All calls are queued onto one STA thread; concurrent MCP requests are serialized. COM objects never leave that thread — tools return plain records.
+- **OLE message filter.** When SolidWorks is busy (rebuild, modal dialog) COM calls are retried for up to `SWMCP_COM_RETRY_TIMEOUT_SECONDS` instead of failing with `RPC_E_CALL_REJECTED`.
+- **Attach first, launch second.** `GetActiveObject` is re-implemented via `oleaut32` (removed from .NET Core). The server never calls `ExitApp` — SolidWorks belongs to the user.
+- **Reconnect.** A liveness ping precedes each call; if SolidWorks was closed or crashed, the next call reconnects.
+- **SI ↔ engineering units** at the tool boundary (the API is always metres/radians).
+- **Localization-safe planes.** `front/top/right` map to the first three reference planes in the tree rather than English names.
+- **stdout is the protocol.** All logging goes to stderr.
+- **Safety.** Path allow-list, macros opt-in, read-only opens for batch jobs, no overwrite on `sw_save_as` unless asked, and MCP tool annotations (`readOnly`, `destructive`, `idempotent`) so clients can require confirmation.
+
+## Verification
+
+What is verified automatically (`dotnet test`, 68 tests, runs on Windows and Linux):
+
+- Compiles against the real SolidWorks 2022 interop, so every API member and argument count used exists.
+- MCP end-to-end: the built server is launched over stdio, tools are listed with JSON schemas and annotations, errors are returned as tool errors and the server stays healthy.
+- Path allow-list (incl. `..` traversal and prefix tricks), configuration parsing, STA dispatcher (single thread, serialization, exceptions, cancellation), BOM aggregation, error-flag decoding, unit conversions.
+
+What still needs a SolidWorks workstation (recommended manual smoke test):
+
+1. `sw_connect` → version reported.
+2. New part → `sw_create_sketch` (center rectangle) → `sw_extrude` 10 mm → `sw_list_dimensions` → `sw_set_dimension` → `sw_screenshot`.
+3. `sw_export` to `.step` and open in another CAD viewer.
+4. Open a real assembly → `sw_get_bom` and compare with a drawing BOM table.
+5. `sw_export_flat_pattern_dxf` on a sheet-metal part; check bend lines in the DXF.
+6. `sw_create_drawing` first-angle → `sw_export` PDF.
+
+Known limitations / roadmap: no mates, revolve, fillet/chamfer, hole wizard, or edge/face selection yet; BOM is computed from the assembly tree (not from a drawing BOM table); `sw_insert_component` places components floating.
+
+## Development
+
+```bash
+dotnet test
+```
+
+The project targets `net8.0-windows` with `EnableWindowsTargeting`, so it builds and its tests run on Linux/macOS; SolidWorks calls return a clear tool error there.
+
+## License
+
+The SolidWorks interop assemblies are © Dassault Systèmes and are subject to your SolidWorks licence. The NuGet fallback packages are third-party repackagings (publisher: *avidesk*); prefer your installation's `api\redist` DLLs for production builds.
