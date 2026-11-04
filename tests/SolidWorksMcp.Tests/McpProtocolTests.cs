@@ -28,7 +28,7 @@ public class McpProtocolTests
         Assert.Contains("millimetres", client.ServerInstructions ?? string.Empty);
 
         var tools = await client.ListToolsAsync();
-        Assert.True(tools.Count >= 63, $"only {tools.Count} tools");
+        Assert.True(tools.Count >= 67, $"only {tools.Count} tools");
         var sketch = tools.Single(t => t.Name == "sw_create_sketch");
         string schema = sketch.JsonSchema.GetRawText();
         Assert.Contains("\"entities\"", schema);
@@ -135,6 +135,24 @@ public class McpProtocolTests
     {
         await using var client = await StartAsync();
         var args = new Dictionary<string, object?> { ["outputPath"] = Path.Combine(Path.GetTempPath(), "bom.csv"), [arg] = value };
+        var result = await client.CallToolAsync(tool, args);
+        Assert.True(result.IsError);
+        Assert.Contains(expected, Text(result));
+    }
+
+    [Theory]
+    [InlineData("sw_insert_model_dimensions", "types", "balloons", "Unknown model item type")]
+    [InlineData("sw_auto_dimension_view", "horizontalScheme", "zigzag", "unknown scheme")]
+    [InlineData("sw_add_drawing_dimension", "orientation", "diagonal", "orientation must be")]
+    [InlineData("sw_add_drawing_dimension", "entity1", "face", "Unknown entity")]
+    public async Task DrawingDimensionToolsValidateBeforeTouchingSolidWorks(string tool, string arg, string value, string expected)
+    {
+        await using var client = await StartAsync();
+        var args = new Dictionary<string, object?>
+        {
+            ["view"] = "Drawing View1", ["point1"] = new[] { 50.0, 50 }, ["textPosition"] = new[] { 50.0, 70 },
+        };
+        args[arg] = arg == "types" ? new[] { value } : value;
         var result = await client.CallToolAsync(tool, args);
         Assert.True(result.IsError);
         Assert.Contains(expected, Text(result));

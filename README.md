@@ -63,7 +63,7 @@ claude mcp add solidworks -e SWMCP_ALLOWED_ROOTS="D:\Engineering\Projects" -- C:
 | `SWMCP_STARTUP_TIMEOUT_SECONDS` | `180` | Max wait for a launched SolidWorks to finish starting. |
 | `SWMCP_COM_RETRY_TIMEOUT_SECONDS` | `60` | How long to retry calls SolidWorks rejects while busy. |
 
-## Tools (63)
+## Tools (67)
 
 Conventions: lengths in **mm**, angles in **degrees**, mass in **kg**. `document` accepts a full path, file name or window title; omit it to use the active document.
 
@@ -78,7 +78,7 @@ Conventions: lengths in **mm**, angles in **degrees**, mass in **kg**. `document
 | Sheet metal | `sw_get_sheet_metal_info` (thickness, bend radius, K-factor, flattened state, cut-list flat size / area / cutting length / bends), `sw_base_flange` (closed or open profile), `sw_edge_flange`, `sw_set_flattened`, `sw_set_sheet_metal_parameters` |
 | Weldments | `sw_list_weldment_profiles` (standard / type / size from the SolidWorks Weldment Profiles folder), `sw_add_structural_member` (members along sketch lines, corner treatment, rotation), `sw_get_weldment_cut_list` (LENGTH, ANGLE1/2, quantity, material, mass per member group), `sw_trim_extend`, `sw_add_end_cap`, `sw_add_gusset` |
 | Equations | `sw_list_equations`, `sw_set_global_variable`, `sw_add_equation`, `sw_delete_equation` |
-| Drawings | `sw_create_drawing` (1st/3rd angle, isometric, import model dimensions), `sw_list_drawing_sheets`, `sw_activate_sheet`, `sw_insert_bom_table` (top-level / parts-only / indented, template, anchor), `sw_read_bom_tables` (rows keyed by column title, all sheets), `sw_export_bom_table` (CSV / TSV) |
+| Drawings | `sw_create_drawing` (1st/3rd angle, isometric, import model dimensions), `sw_list_drawing_sheets`, `sw_activate_sheet`, `sw_insert_bom_table` (top-level / parts-only / indented, template, anchor), `sw_read_bom_tables` (rows keyed by column title, all sheets), `sw_export_bom_table` (CSV / TSV), `sw_insert_model_dimensions` (Insert Model Items into all or named views), `sw_list_drawing_dimensions` (value, type, tolerance, driving/driven, position), `sw_auto_dimension_view` (baseline / ordinate / chain / centerline), `sw_add_drawing_dimension` (between entities picked at sheet positions) |
 | Macros | `sw_run_macro` (disabled by default) |
 
 ### Example prompts
@@ -87,6 +87,7 @@ Conventions: lengths in **mm**, angles in **degrees**, mass in **kg**. `document
 - *"Export every sheet-metal part in D:\Projects\Cabinet\Parts to flat-pattern DXF in C:\Exports\Laser."*
 - *"Create a 600 × 400 × 3 mm plate on the top plane with four Ø9 mm holes 25 mm from each corner, set material AISI 304, and save it as C:\Work\plate.sldprt."*
 - *"Make a turned spacer: on the front plane sketch a 20 × 5 mm rectangle 10 mm from a vertical centerline, revolve it 360°, then fillet the outer circular edges R1."*
+- *"In bracket.slddrw, insert the model dimensions and hole callouts into the front and right views, then list every dimension with its tolerance so I can check the drawing."*
 - *"In LabBench.slddrw, add a parts-only BOM table at the top-right anchor, then export it to C:\Exports\LabBench-BOM.csv for purchasing."*
 - *"Build a 1200 × 600 mm table frame from ISO square tube 40 × 40 × 4 with mitred corners, add 5 mm end caps to the legs, and give me a saw cutting list with lengths and angles."*
 - *"Make a 2 mm sheet metal bracket: base flange from a 200 × 100 mm rectangle with R2 bends and K 0.44, add 40 mm 90° flanges on both long edges, then give me the flat blank size and bend count for a laser quote."*
@@ -121,11 +122,11 @@ Design decisions:
 
 ## Verification
 
-What is verified automatically (`dotnet test`, 273 tests, runs on Windows and Linux):
+What is verified automatically (`dotnet test`, 313 tests, runs on Windows and Linux):
 
 - Compiles against the real SolidWorks 2022 interop, so every API member and argument count used exists.
 - MCP end-to-end: the built server is launched over stdio, tools are listed with JSON schemas and annotations, errors are returned as tool errors and the server stays healthy.
-- Path allow-list (incl. `..` traversal and prefix tricks), configuration parsing, STA dispatcher (single thread, serialization, exceptions, cancellation), BOM aggregation, error-flag decoding, unit conversions, fillet/chamfer edge de-duplication and nearest-edge picking, chamfer parameter rules, mate type/alignment parsing, mate reference validation, component name matching, Hole Wizard type/size/depth rules and point-on-plane checks, sheet metal parameter/flange rules, cut-list number parsing, weldment profile library scanning/lookup, corner/trim/gusset option parsing and body/segment name matching, BOM table option parsing, template choice and table-grid-to-rows conversion.
+- Path allow-list (incl. `..` traversal and prefix tricks), configuration parsing, STA dispatcher (single thread, serialization, exceptions, cancellation), BOM aggregation, error-flag decoding, unit conversions, fillet/chamfer edge de-duplication and nearest-edge picking, chamfer parameter rules, mate type/alignment parsing, mate reference validation, component name matching, Hole Wizard type/size/depth rules and point-on-plane checks, sheet metal parameter/flange rules, cut-list number parsing, weldment profile library scanning/lookup, corner/trim/gusset option parsing and body/segment name matching, BOM table option parsing, template choice and table-grid-to-rows conversion, drawing dimension option parsing (model item bit mask, schemes, placements, picks) and finding the view under a sheet point.
 
 What still needs a SolidWorks workstation (recommended manual smoke test):
 
@@ -143,6 +144,7 @@ What still needs a SolidWorks workstation (recommended manual smoke test):
 12. Sheet metal: `sw_create_sketch` a 200 × 100 rectangle on top → `sw_base_flange` 2 mm, R2, K 0.44 → `sw_list_edges` → `sw_edge_flange` 40 mm 90° on both long edges → `sw_get_sheet_metal_info` (compare bounding box and Bends with the Cut-List Properties dialog) → `sw_set_flattened` true/false → `sw_set_sheet_metal_parameters` thickness 3 → `sw_export_flat_pattern_dxf`.
 13. Weldment: `sw_list_weldment_profiles` → 3D or 2D sketch of a rectangular frame plus four vertical legs → `sw_add_structural_member` square tube for the frame (miter) and again for the legs → `sw_get_weldment_cut_list` (compare with the Cut-List Properties dialog) → `sw_trim_extend` the legs to the frame → `sw_add_end_cap` on the leg bottoms → `sw_add_gusset` in one corner.
 14. Drawing BOM: `sw_create_drawing` of an assembly → `sw_insert_bom_table` parts_only (default template) → `sw_read_bom_tables` (compare with the table on the sheet and with `sw_get_bom`) → `sw_export_bom_table` to .csv and open it in Excel.
+15. Drawing dimensions: drawing of a part with marked dimensions and Hole Wizard holes → `sw_insert_model_dimensions` (all views, then `types: [hole_callouts]` on one view) → `sw_list_drawing_dimensions` (compare values and tolerances with the sheet) → `sw_auto_dimension_view` baseline on a view → `sw_add_drawing_dimension` between two parallel edges, horizontal.
 
 Known limitations / roadmap: no advanced/mechanical mates (width, symmetric, gear, slot, limit mates), vertex chamfers, variable-radius or face fillets, non-ISO Hole Wizard standards (ANSI, DIN, JIS...), sheet metal hems / miter flanges / sketched bends / gauge tables / convert-to-sheet-metal, weld beads / weld tables / polygonal or chamfered gussets / multiple member groups per feature, thin revolves, or face selection yet; `sw_get_bom` computes the BOM from the assembly tree, while the drawing tools read the BOM table on the sheet (no editing of table cells or columns yet); `sw_insert_component` places components floating (fix or mate them afterwards).
 
