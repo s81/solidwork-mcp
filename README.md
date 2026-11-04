@@ -174,3 +174,7 @@ The project targets `net8.0-windows` with `EnableWindowsTargeting`, so it builds
 ## License
 
 The SolidWorks interop assemblies are © Dassault Systèmes and are subject to your SolidWorks licence. The NuGet fallback packages are third-party repackagings (publisher: *avidesk*); prefer your installation's `api\redist` DLLs for production builds.
+
+## License
+
+[MIT](LICENSE) © 2026 Samer William Al-Haddadin. Bundled third-party components keep their own licences: see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). SolidWorks is a trademark of Dassault Systèmes SolidWorks Corporation, and this project is not affiliated with Dassault Systèmes.

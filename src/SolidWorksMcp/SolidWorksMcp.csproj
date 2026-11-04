@@ -14,6 +14,10 @@
     <AssemblyName>SolidWorksMcp</AssemblyName>
     <RootNamespace>SolidWorksMcp</RootNamespace>
     <Version>0.1.0</Version>
+    <Authors>Samer William Al-Haddadin</Authors>
+    <Copyright>Copyright (c) 2026 Samer William Al-Haddadin</Copyright>
+    <Product>SolidWorks MCP Server</Product>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <!-- Interop assemblies target .NET Framework; they are plain COM type metadata and load fine on .NET 8. -->
     <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
