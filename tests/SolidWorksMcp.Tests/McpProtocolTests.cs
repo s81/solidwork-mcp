@@ -28,7 +28,7 @@ public class McpProtocolTests
         Assert.Contains("millimetres", client.ServerInstructions ?? string.Empty);
 
         var tools = await client.ListToolsAsync();
-        Assert.True(tools.Count >= 60, $"only {tools.Count} tools");
+        Assert.True(tools.Count >= 63, $"only {tools.Count} tools");
         var sketch = tools.Single(t => t.Name == "sw_create_sketch");
         string schema = sketch.JsonSchema.GetRawText();
         Assert.Contains("\"entities\"", schema);
@@ -122,6 +122,19 @@ public class McpProtocolTests
             ["points"] = new[] { new[] { 0.0, 0, 0 }, new[] { 1.0, 0, 0 } }, ["thicknessMm"] = 5.0, ["leg1Mm"] = 50.0, ["leg2Mm"] = 50.0,
         };
         args[arg] = value;
+        var result = await client.CallToolAsync(tool, args);
+        Assert.True(result.IsError);
+        Assert.Contains(expected, Text(result));
+    }
+
+    [Theory]
+    [InlineData("sw_insert_bom_table", "type", "flat", "Unknown BOM type")]
+    [InlineData("sw_insert_bom_table", "anchor", "middle", "Unknown anchor")]
+    [InlineData("sw_export_bom_table", "outputPath", "C:\\bom.xlsx", "Unsupported export format")]
+    public async Task BomTableToolsValidateBeforeTouchingSolidWorks(string tool, string arg, string value, string expected)
+    {
+        await using var client = await StartAsync();
+        var args = new Dictionary<string, object?> { ["outputPath"] = Path.Combine(Path.GetTempPath(), "bom.csv"), [arg] = value };
         var result = await client.CallToolAsync(tool, args);
         Assert.True(result.IsError);
         Assert.Contains(expected, Text(result));
