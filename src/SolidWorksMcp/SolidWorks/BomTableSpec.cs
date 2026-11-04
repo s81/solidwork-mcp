@@ -63,8 +63,8 @@ public static class BomTableSpec
     /// Turn a table grid into records keyed by column title. Header rows are skipped wherever SolidWorks put them
     /// (top or bottom). Empty titles become "Column N" and duplicate titles get a numeric suffix so no value is lost.
     /// </summary>
-    public static List<Dictionary<string, string>> ToRows(IReadOnlyList<string?> titles, int rowCount, Func<int, int, string?> cell,
-        int headerCount, swTableHeaderPosition_e headerPosition)
+    /// <summary>Record keys for table columns: empty titles become "Column N", duplicates get a numeric suffix.</summary>
+    public static List<string> ColumnKeys(IReadOnlyList<string?> titles)
     {
         var keys = new List<string>();
         for (int c = 0; c < titles.Count; c++)
@@ -77,6 +77,13 @@ public static class BomTableSpec
             }
             keys.Add(unique);
         }
+        return keys;
+    }
+
+    public static List<Dictionary<string, string>> ToRows(IReadOnlyList<string?> titles, int rowCount, Func<int, int, string?> cell,
+        int headerCount, swTableHeaderPosition_e headerPosition)
+    {
+        var keys = ColumnKeys(titles);
 
         int first = headerPosition == swTableHeaderPosition_e.swTableHeader_Top ? headerCount : 0;
         int last = headerPosition == swTableHeaderPosition_e.swTableHeader_Bottom ? rowCount - headerCount : rowCount;
