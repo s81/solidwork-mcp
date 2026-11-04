@@ -327,7 +327,7 @@ public sealed class ModelingTools(SolidWorksSession sw)
             return list;
         }, ct);
 
-    private static (double Value, string Unit) ToUser(Dimension dim)
+    internal static (double Value, string Unit) ToUser(Dimension dim)
     {
         double si = dim.SystemValue;
         return dim.GetType() switch
