@@ -1,0 +1,56 @@
+name: Mark release superseded
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release to mark as superseded (e.g. v0.1.0).'
+        required: true
+      superseded_by:
+        description: 'Release that replaces it (e.g. v0.1.1).'
+        required: true
+      reason:
+        description: 'Optional extra sentence shown in the warning, e.g. what the newer release fixes.'
+        required: false
+        default: ''
+permissions:
+  contents: write
+jobs:
+  supersede:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ inputs.tag }}
+      NEW: ${{ inputs.superseded_by }}
+      REASON: ${{ inputs.reason }}
+    steps:
+      - name: Edit release
+        shell: bash
+        run: |
+          set -euo pipefail
+          re='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+          [[ "$TAG" =~ $re ]] || { echo "::error::Invalid tag '$TAG'"; exit 1; }
+          [[ "$NEW" =~ $re ]] || { echo "::error::Invalid tag '$NEW'"; exit 1; }
+          [[ "$TAG" != "$NEW" ]] || { echo "::error::A release cannot supersede itself."; exit 1; }
+          gh release view "$NEW" --json tagName > /dev/null || { echo "::error::Release $NEW does not exist."; exit 1; }
+
+          title=$(gh release view "$TAG" --json name --jq .name)
+          gh release view "$TAG" --json body --jq .body > body.md
+          url="https://github.com/$GH_REPO/releases/tag/$NEW"
+
+          # Idempotent: strip an earlier "superseded" banner before adding the new one.
+          python3 - "$url" "$NEW" "$REASON" <<'PY'
+          import re, sys
+          url, new, reason = sys.argv[1:4]
+          body = open("body.md", encoding="utf-8").read()
+          body = re.sub(r"\A> \[!WARNING\]\r?\n> \*\*Superseded by .*?(\r?\n\r?\n|\Z)", "", body, flags=re.S)
+          banner = f"> [!WARNING]\n> **Superseded by [{new}]({url}).** Please use {new} instead."
+          if reason.strip():
+              banner += " " + reason.strip()
+          open("body.md", "w", encoding="utf-8").write(banner + "\n\n" + body)
+          PY
+
+          base=$(printf '%s' "$title" | sed -E 's/ \(superseded by [^)]*\)$//')
+          gh release edit "$TAG" --title "$base (superseded by ${NEW#v})" --notes-file body.md --prerelease --latest=false
+          gh release view "$TAG" --json name,isPrerelease --jq '"\(.name) | prerelease=\(.isPrerelease)"'
+          head -3 body.md
