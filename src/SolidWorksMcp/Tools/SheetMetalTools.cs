@@ -45,50 +45,12 @@ public sealed class SheetMetalTools(SolidWorksSession sw)
                 document = doc.GetTitle(),
                 flattened = FlatPattern(doc) is Feature fp ? !fp.IsSuppressed() : (bool?)null,
                 sheetMetal = parameters,
-                cutList = ReadCutList(doc),
+                cutList = CutList.Read(doc),
             };
         }, ct);
 
     private static Feature? FlatPattern(ModelDoc2 doc)
         => FeatureWalker.Walk(doc, includeSubFeatures: false).Select(x => x.Feature).FirstOrDefault(f => f.GetTypeName2() == "FlatPattern");
-
-    private static List<object> ReadCutList(ModelDoc2 doc)
-    {
-        var items = new List<object>();
-        var solidFolder = FeatureWalker.Walk(doc, includeSubFeatures: false).Select(x => x.Feature)
-            .FirstOrDefault(f => f.GetTypeName2() == "SolidBodyFolder");
-        if (solidFolder?.GetSpecificFeature2() is BodyFolder root)
-        {
-            root.UpdateCutList(); // cut-list properties are only current after an update
-        }
-
-        foreach (var (f, _) in FeatureWalker.Walk(doc))
-        {
-            if (f.GetTypeName2() != "CutListFolder")
-            {
-                continue;
-            }
-            var props = new Dictionary<string, string>();
-            var numbers = new Dictionary<string, double>();
-            CustomPropertyManager? mgr = f.CustomPropertyManager;
-            if (mgr?.GetNames() is object[] names)
-            {
-                foreach (string n in names.Cast<string>())
-                {
-                    mgr.Get6(n, false, out _, out string resolved, out _, out _);
-                    props[n] = resolved ?? string.Empty;
-                    if (SheetMetalSpec.NumericCutListKeys.Contains(n, StringComparer.OrdinalIgnoreCase) &&
-                        SheetMetalSpec.ParseCutListNumber(resolved) is double v)
-                    {
-                        numbers[n] = v;
-                    }
-                }
-            }
-            int bodies = (f.GetSpecificFeature2() as BodyFolder)?.GetBodyCount() ?? 0;
-            items.Add(new { name = f.Name, bodies, numbers, properties = props });
-        }
-        return items;
-    }
 
     [McpServerTool(Name = "sw_base_flange", Title = "Sheet metal base flange", OpenWorld = false)]
     [Description("Create a sheet metal part's first feature from a sketch. A closed profile makes a flat blank (tab); an open profile (lines/arcs) is bent along its corners and extruded by depthMm (e.g. a U-channel or bracket). Sets thickness, inside bend radius and K-factor.")]

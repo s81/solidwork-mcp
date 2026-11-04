@@ -28,7 +28,7 @@ public class McpProtocolTests
         Assert.Contains("millimetres", client.ServerInstructions ?? string.Empty);
 
         var tools = await client.ListToolsAsync();
-        Assert.True(tools.Count >= 54, $"only {tools.Count} tools");
+        Assert.True(tools.Count >= 60, $"only {tools.Count} tools");
         var sketch = tools.Single(t => t.Name == "sw_create_sketch");
         string schema = sketch.JsonSchema.GetRawText();
         Assert.Contains("\"entities\"", schema);
@@ -100,6 +100,26 @@ public class McpProtocolTests
         {
             ["sketch"] = "Sketch1", ["thicknessMm"] = 2.0, ["bendRadiusMm"] = 1.0, ["lengthMm"] = 20.0,
             ["points"] = new[] { new[] { 0.0, 0, 0 } },
+        };
+        args[arg] = value;
+        var result = await client.CallToolAsync(tool, args);
+        Assert.True(result.IsError);
+        Assert.Contains(expected, Text(result));
+    }
+
+    [Theory]
+    [InlineData("sw_add_structural_member", "cornerTreatment", "zigzag", "Unknown corner treatment")]
+    [InlineData("sw_add_structural_member", "standard", null, "Give standard, type and size")]
+    [InlineData("sw_trim_extend", "type", "weld", "Unknown trim type")]
+    [InlineData("sw_add_gusset", "location", "top", "Unknown gusset location")]
+    public async Task WeldmentToolsValidateBeforeTouchingSolidWorks(string tool, string arg, string? value, string expected)
+    {
+        await using var client = await StartAsync();
+        var args = new Dictionary<string, object?>
+        {
+            ["sketch"] = "Sketch1", ["standard"] = "iso", ["type"] = "square tube", ["size"] = "40 x 40 x 4",
+            ["bodiesToTrim"] = new[] { "A" }, ["boundaryBodies"] = new[] { "B" },
+            ["points"] = new[] { new[] { 0.0, 0, 0 }, new[] { 1.0, 0, 0 } }, ["thicknessMm"] = 5.0, ["leg1Mm"] = 50.0, ["leg2Mm"] = 50.0,
         };
         args[arg] = value;
         var result = await client.CallToolAsync(tool, args);

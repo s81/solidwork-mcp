@@ -13,6 +13,7 @@ internal static class ServerInstructions
         - Revolve needs a closed profile plus one centerline in the same sketch. For fillets and chamfers, use sw_list_edges and pass edge midpoints as points.
         - Hole Wizard: points are hole centres in model coordinates on one planar face; get face positions from sw_get_mass_properties / sw_list_edges or the sketch you extruded.
         - Sheet metal: start with sw_base_flange, add flanges with sw_edge_flange (edge midpoints from sw_list_edges), and use sw_get_sheet_metal_info for flat blank size and bend count.
+        - Weldments: call sw_list_weldment_profiles before sw_add_structural_member so standard/type/size are real; body names for trim/extend come from sw_get_weldment_cut_list.
         - Mates: fix one base component (sw_set_component_fixed), then mate others to it. Plane/origin references (feature: front/top/right/origin) are the most reliable; entity + point picks faces/edges at assembly coordinates.
         - Prefer sw_list_features / sw_list_dimensions before editing so you use real feature and dimension names.
         """;
