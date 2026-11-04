@@ -1,0 +1,49 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version without the v (e.g. 0.1.0). Builds the zips as a workflow artifact only, no GitHub Release.'
+        required: true
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Version
+        shell: pwsh
+        run: |
+          $v = if ('${{ github.ref_type }}' -eq 'tag') { '${{ github.ref_name }}'.TrimStart('v') } else { '${{ inputs.version }}' }
+          if ($v -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw "Invalid version '$v'" }
+          "VERSION=$v" >> $env:GITHUB_ENV
+      - run: dotnet test -c Release
+      - name: Package
+        shell: pwsh
+        run: ./build/package.ps1 -Version $env:VERSION
+      - name: Smoke test (self-contained)
+        shell: pwsh
+        run: ./build/smoke-test.ps1 -Exe "artifacts/solidworks-mcp-$env:VERSION-win-x64/SolidWorksMcp.exe"
+      - name: Smoke test (framework-dependent)
+        shell: pwsh
+        run: ./build/smoke-test.ps1 -Exe "artifacts/solidworks-mcp-$env:VERSION-win-x64-framework/SolidWorksMcp.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: solidworks-mcp-${{ env.VERSION }}
+          path: |
+            artifacts/*.zip
+            artifacts/SHA256SUMS.txt
+      - name: GitHub Release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create '${{ github.ref_name }}' artifacts/*.zip artifacts/SHA256SUMS.txt `
+            --title "SolidWorks MCP $env:VERSION" --notes-file docs/RELEASE_NOTES.md

@@ -15,6 +15,17 @@ Built with the official [MCP C# SDK](https://github.com/modelcontextprotocol/csh
 | Runtime | .NET 8 runtime (or publish self-contained) |
 | Build | .NET 8 SDK |
 
+## Download
+
+Windows builds are on the [Releases](https://github.com/s81/solidwork-mcp/releases) page:
+
+- `solidworks-mcp-<version>-win-x64.zip` is self-contained, with no .NET install needed.
+- `solidworks-mcp-<version>-win-x64-framework.zip` needs the .NET 8 Runtime x64.
+
+Unzip it to e.g. `C:\Tools\solidworks-mcp` and follow [`docs/INSTALL.md`](docs/INSTALL.md), which is also in the zip.
+
+To make a release, push a tag such as `v0.2.0`. [`release.yml`](.github/workflows/release.yml) then tests, packages (`build/package.ps1`) and smoke-tests both zips on Windows (`build/smoke-test.ps1`), and publishes the GitHub Release.
+
 ## Build & install
 
 ```bash
@@ -123,7 +134,7 @@ Design decisions:
 
 ## Verification
 
-What is verified automatically (`dotnet test`, 336 tests, runs on Windows and Linux):
+What is verified automatically (`dotnet test`, 409 tests, runs on Windows and Linux):
 
 - Compiles against the real SolidWorks 2022 interop, so every API member and argument count used exists.
 - MCP end-to-end: the built server is launched over stdio, tools are listed with JSON schemas and annotations, errors are returned as tool errors and the server stays healthy.
