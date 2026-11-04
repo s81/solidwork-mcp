@@ -16,6 +16,7 @@ internal static class ServerInstructions
         - Weldments: call sw_list_weldment_profiles before sw_add_structural_member so standard/type/size are real; body names for trim/extend come from sw_get_weldment_cut_list.
         - Drawing dimensions: prefer sw_insert_model_dimensions (uses the model's own dimensions); sheet positions for sw_add_drawing_dimension are mm from the sheet's lower-left corner.
         - Balloons: insert the BOM table first (sw_insert_bom_table) so sw_auto_balloon numbers match it. Balloons show BOM item numbers: change numbers with sw_renumber_bom_items, not by editing balloon text. Call sw_list_balloons before sw_edit_balloons / sw_delete_balloons / sw_add_magnetic_line to get view names, item numbers and indices.
+        - Revisions: one revision table per sheet; sw_add_revision picks the next revision itself, so only pass revision to override it. Call sw_read_revision_tables before editing or deleting to get the real revision letters and column titles.
         - BOM: sw_get_bom reads the assembly structure; sw_read_bom_tables reads a drawing's BOM table exactly as displayed (use it when the drawing is the released document).
         - Mates: fix one base component (sw_set_component_fixed), then mate others to it. Plane/origin references (feature: front/top/right/origin) are the most reliable; entity + point picks faces/edges at assembly coordinates.
         - Prefer sw_list_features / sw_list_dimensions before editing so you use real feature and dimension names.
