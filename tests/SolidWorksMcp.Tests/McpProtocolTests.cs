@@ -28,7 +28,7 @@ public class McpProtocolTests
         Assert.Contains("millimetres", client.ServerInstructions ?? string.Empty);
 
         var tools = await client.ListToolsAsync();
-        Assert.True(tools.Count >= 67, $"only {tools.Count} tools");
+        Assert.True(tools.Count >= 70, $"only {tools.Count} tools");
         var sketch = tools.Single(t => t.Name == "sw_create_sketch");
         string schema = sketch.JsonSchema.GetRawText();
         Assert.Contains("\"entities\"", schema);
@@ -153,6 +153,19 @@ public class McpProtocolTests
             ["view"] = "Drawing View1", ["point1"] = new[] { 50.0, 50 }, ["textPosition"] = new[] { 50.0, 70 },
         };
         args[arg] = arg == "types" ? new[] { value } : value;
+        var result = await client.CallToolAsync(tool, args);
+        Assert.True(result.IsError);
+        Assert.Contains(expected, Text(result));
+    }
+
+    [Theory]
+    [InlineData("sw_auto_balloon", "layout", "spiral", "Unknown layout")]
+    [InlineData("sw_auto_balloon", "lowerText", "quantity", "split styles")]
+    [InlineData("sw_add_balloon", "upperText", "custom", "needs the text")]
+    public async Task BalloonToolsValidateBeforeTouchingSolidWorks(string tool, string arg, string value, string expected)
+    {
+        await using var client = await StartAsync();
+        var args = new Dictionary<string, object?> { ["point"] = new[] { 50.0, 50 }, ["balloonPosition"] = new[] { 80.0, 90 }, [arg] = value };
         var result = await client.CallToolAsync(tool, args);
         Assert.True(result.IsError);
         Assert.Contains(expected, Text(result));
