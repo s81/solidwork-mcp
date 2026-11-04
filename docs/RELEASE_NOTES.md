@@ -8,7 +8,7 @@ First release of the SolidWorks MCP server for **SolidWorks 2022 or newer** on W
 | `solidworks-mcp-<version>-win-x64-framework.zip` | PCs that already have the .NET 8 Runtime x64. |
 | `SHA256SUMS.txt` | Checksums. Check with `Get-FileHash <zip>`. |
 
-Each zip has `SolidWorksMcp.exe`, `INSTALL.md` (setup, settings, troubleshooting), `README.md` (all tools, architecture, smoke test) and `claude_desktop_config.example.json`.
+Each zip has `SolidWorksMcp.exe`, `INSTALL.md` (setup, settings, troubleshooting), `README.md` (all tools, architecture, smoke test), `LICENSE.txt` (MIT), `THIRD-PARTY-NOTICES.md` and `claude_desktop_config.example.json`.
 
 ## Tools
 

@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
   Builds the Windows release zips: self-contained and framework-dependent, each with SolidWorksMcp.exe,
-  INSTALL.md, README.md and an example Claude Desktop config. Writes SHA256SUMS.txt next to them.
+  INSTALL.md, README.md, LICENSE.txt, THIRD-PARTY-NOTICES.md and an example Claude Desktop config. Writes SHA256SUMS.txt next to them.
 .EXAMPLE
   pwsh build/package.ps1 -Version 0.1.0
 #>
@@ -32,6 +32,8 @@ foreach ($v in $variants) {
 
     Copy-Item (Join-Path $root 'docs/INSTALL.md') $stage
     Copy-Item (Join-Path $root 'README.md') $stage
+    Copy-Item (Join-Path $root 'LICENSE') (Join-Path $stage 'LICENSE.txt')
+    Copy-Item (Join-Path $root 'THIRD-PARTY-NOTICES.md') $stage
     Copy-Item (Join-Path $root 'examples/claude_desktop_config.json') (Join-Path $stage 'claude_desktop_config.example.json')
 
     $zip = Join-Path $out "$($v.Name).zip"
