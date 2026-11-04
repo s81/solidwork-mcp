@@ -28,7 +28,7 @@ public class McpProtocolTests
         Assert.Contains("millimetres", client.ServerInstructions ?? string.Empty);
 
         var tools = await client.ListToolsAsync();
-        Assert.True(tools.Count >= 67, $"only {tools.Count} tools");
+        Assert.True(tools.Count >= 75, $"only {tools.Count} tools");
         var sketch = tools.Single(t => t.Name == "sw_create_sketch");
         string schema = sketch.JsonSchema.GetRawText();
         Assert.Contains("\"entities\"", schema);
@@ -153,6 +153,43 @@ public class McpProtocolTests
             ["view"] = "Drawing View1", ["point1"] = new[] { 50.0, 50 }, ["textPosition"] = new[] { 50.0, 70 },
         };
         args[arg] = arg == "types" ? new[] { value } : value;
+        var result = await client.CallToolAsync(tool, args);
+        Assert.True(result.IsError);
+        Assert.Contains(expected, Text(result));
+    }
+
+    [Theory]
+    [InlineData("sw_auto_balloon", "layout", "spiral", "Unknown layout")]
+    [InlineData("sw_auto_balloon", "lowerText", "quantity", "split styles")]
+    [InlineData("sw_add_balloon", "upperText", "custom", "needs the text")]
+    [InlineData("sw_auto_balloon", "itemOrder", "random", "Unknown item order")]
+    [InlineData("sw_add_stacked_balloon", "direction", "diagonal", "Unknown stack direction")]
+    [InlineData("sw_edit_balloons", "style", "star", "Unknown balloon style")]
+    [InlineData("sw_add_magnetic_line", "view", "", "different points")]
+    public async Task BalloonToolsValidateBeforeTouchingSolidWorks(string tool, string arg, string value, string expected)
+    {
+        await using var client = await StartAsync();
+        var args = new Dictionary<string, object?>
+        {
+            ["point"] = new[] { 50.0, 50 }, ["balloonPosition"] = new[] { 80.0, 90 },
+            ["points"] = new[] { new[] { 50.0, 50 }, new[] { 60.0, 50 } }, ["view"] = "Drawing View1",
+            ["start"] = new[] { 20.0, 20 }, ["end"] = new[] { 20.0, 20 }, [arg] = value,
+        };
+        var result = await client.CallToolAsync(tool, args);
+        Assert.True(result.IsError);
+        Assert.Contains(expected, Text(result));
+    }
+
+    [Theory]
+    [InlineData("sw_edit_balloons", "{\"view\":\"Drawing View1\",\"all\":true}", "Nothing to change")]
+    [InlineData("sw_add_stacked_balloon", "{\"points\":[[50,50]],\"balloonPosition\":[80,90]}", "at least 2")]
+    [InlineData("sw_add_magnetic_line", "{\"start\":[10,10],\"end\":[100,10],\"all\":true}", "Pass view")]
+    [InlineData("sw_renumber_bom_items", "{\"startNumber\":0}", "startNumber")]
+    [InlineData("sw_renumber_bom_items", "{\"sortColumn\":\"PART NUMBER\",\"followAssemblyOrder\":true}", "not both")]
+    public async Task BalloonEditingValidatesBeforeTouchingSolidWorks(string tool, string json, string expected)
+    {
+        await using var client = await StartAsync();
+        var args = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(json)!;
         var result = await client.CallToolAsync(tool, args);
         Assert.True(result.IsError);
         Assert.Contains(expected, Text(result));

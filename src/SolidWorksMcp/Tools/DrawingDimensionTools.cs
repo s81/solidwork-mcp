@@ -11,37 +11,6 @@ namespace SolidWorksMcp.Tools;
 [McpServerToolType]
 public sealed class DrawingDimensionTools(SolidWorksSession sw)
 {
-    private sealed record ViewRef(string Sheet, View View, bool IsSheet);
-
-    private static List<ViewRef> AllViews(DrawingDoc drw)
-    {
-        var list = new List<ViewRef>();
-        foreach (object[] sheetViews in (drw.GetViews() as object[] ?? Array.Empty<object>()).OfType<object[]>())
-        {
-            if (sheetViews.Length == 0 || sheetViews[0] is not View sheetView)
-            {
-                continue;
-            }
-            string sheet = sheetView.GetName2();
-            list.Add(new ViewRef(sheet, sheetView, true));
-            list.AddRange(sheetViews.Skip(1).OfType<View>().Select(v => new ViewRef(sheet, v, false)));
-        }
-        return list;
-    }
-
-    private static ViewRef FindView(List<ViewRef> views, string name)
-        => views.FirstOrDefault(v => !v.IsSheet && string.Equals(v.View.GetName2(), name.Trim(), StringComparison.OrdinalIgnoreCase))
-           ?? throw new McpException($"View '{name}' not found. Views: {string.Join(", ", views.Where(v => !v.IsSheet).Select(v => v.View.GetName2()))}.");
-
-    private static void SelectView(ModelDoc2 doc, DrawingDoc drw, ViewRef v, bool append)
-    {
-        drw.ActivateSheet(v.Sheet);
-        if (!doc.Extension.SelectByID2(v.View.GetName2(), "DRAWINGVIEW", 0, 0, 0, append, 0, null, 0))
-        {
-            throw new McpException($"Could not select view '{v.View.GetName2()}'.");
-        }
-    }
-
     [McpServerTool(Name = "sw_insert_model_dimensions", Title = "Insert model items into drawing views", OpenWorld = false)]
     [Description("Insert Model Items into existing drawing views: dimensions marked for drawing (default), unmarked dimensions, Hole Wizard dimensions, hole callouts, notes, datums, GD&T and more. Applies to all views or only the named ones. Reports how many dimensions each view gained.")]
     public Task<object> InsertModelDimensions(
@@ -57,8 +26,8 @@ public sealed class DrawingDimensionTools(SolidWorksSession sw)
         {
             Documents.RequireType(doc, swDocumentTypes_e.swDocDRAWING, "Inserting model items");
             var drw = (DrawingDoc)doc;
-            var all = AllViews(drw);
-            var targets = views is { Length: > 0 } ? views.Select(n => FindView(all, n)).ToList() : all.Where(v => !v.IsSheet).ToList();
+            var all = DrawingViews.All(drw);
+            var targets = views is { Length: > 0 } ? views.Select(n => DrawingViews.Find(all, n)).ToList() : all.Where(v => !v.IsSheet).ToList();
             if (targets.Count == 0)
             {
                 throw new McpException("The drawing has no model views.");
@@ -72,7 +41,7 @@ public sealed class DrawingDimensionTools(SolidWorksSession sw)
                 // With AllViews = false, Insert Model Items acts on the selected views.
                 for (int i = 0; i < targets.Count; i++)
                 {
-                    SelectView(doc, drw, targets[i], append: i > 0);
+                    DrawingViews.Select(doc, drw, targets[i], append: i > 0);
                 }
             }
             // InsertModelAnnotations3(Option, Types, AllViews, DuplicateDims, HiddenFeatureDims, UsePlacementInSketch)
@@ -106,7 +75,7 @@ public sealed class DrawingDimensionTools(SolidWorksSession sw)
         {
             Documents.RequireType(doc, swDocumentTypes_e.swDocDRAWING, "Listing drawing dimensions");
             var result = new List<DrawingDimensionInfo>();
-            foreach (var v in AllViews((DrawingDoc)doc))
+            foreach (var v in DrawingViews.All((DrawingDoc)doc))
             {
                 if (sheet is not null && !string.Equals(v.Sheet, sheet.Trim(), StringComparison.OrdinalIgnoreCase)) continue;
                 if (view is not null && !string.Equals(v.View.GetName2(), view.Trim(), StringComparison.OrdinalIgnoreCase)) continue;
@@ -163,11 +132,11 @@ public sealed class DrawingDimensionTools(SolidWorksSession sw)
         {
             Documents.RequireType(doc, swDocumentTypes_e.swDocDRAWING, "Auto Dimension");
             var drw = (DrawingDoc)doc;
-            var target = FindView(AllViews(drw), view);
+            var target = DrawingViews.Find(DrawingViews.All(drw), view);
             int before = target.View.GetDisplayDimensionCount();
 
             doc.ClearSelection2(true);
-            SelectView(doc, drw, target, append: false);
+            DrawingViews.Select(doc, drw, target, append: false);
             drw.ActivateView(target.View.GetName2());
             int status = drw.AutoDimension((int)swAutodimEntities_e.swAutodimEntitiesAll, (int)h, (int)hp, (int)vs, (int)vp);
             doc.ClearSelection2(true);
@@ -206,22 +175,8 @@ public sealed class DrawingDimensionTools(SolidWorksSession sw)
         {
             Documents.RequireType(doc, swDocumentTypes_e.swDocDRAWING, "Adding dimensions");
             var drw = (DrawingDoc)doc;
-            var all = AllViews(drw);
-            ViewRef target;
-            if (view is not null)
-            {
-                target = FindView(all, view);
-            }
-            else
-            {
-                string active = (drw.GetCurrentSheet() as Sheet)?.GetName() ?? string.Empty;
-                var candidates = all.Where(v => !v.IsSheet && v.Sheet == active).ToList();
-                var outlines = candidates.Select(v => (v.View.GetOutline() as double[] ?? Array.Empty<double>()).Select(Units.MToMm).ToArray()).ToList();
-                int idx = DrawingDimensionSpec.ViewAt(outlines, point1);
-                target = idx >= 0 ? candidates[idx]
-                    : throw new McpException($"No view on the active sheet '{active}' contains point1 [{string.Join(", ", point1)}] mm. Pass 'view' or check the coordinates.");
-            }
-
+            var all = DrawingViews.All(drw);
+            ViewRef target = DrawingViews.AtPoint(drw, all, view, point1, nameof(point1));
             drw.ActivateSheet(target.Sheet);
             drw.ActivateView(target.View.GetName2());
             doc.ClearSelection2(true);

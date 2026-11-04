@@ -106,4 +106,15 @@ public class BomTableSpecTests
         var row = BomTableSpec.ToRows(new string?[] { "A", "B" }, 1, (r, c) => c == 0 ? "x" : null, 0, swTableHeaderPosition_e.swTableHeader_None).Single();
         Assert.Equal(string.Empty, row["B"]);
     }
+
+    [Theory]
+    [InlineData("PART NUMBER", 1)]
+    [InlineData("  part   number ", 1)]
+    [InlineData("qty.", 3)]
+    public void FindsColumnByTitle(string column, int expected)
+        => Assert.Equal(expected, BomTableSpec.ColumnIndex(new[] { "ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY." }, column));
+
+    [Fact]
+    public void UnknownColumnListsColumns()
+        => Assert.Contains("ITEM NO., QTY.", Assert.Throws<McpException>(() => BomTableSpec.ColumnIndex(new[] { "ITEM NO.", "QTY." }, "MASS")).Message);
 }

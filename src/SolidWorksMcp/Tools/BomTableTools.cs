@@ -189,4 +189,61 @@ public sealed class BomTableTools(SolidWorksSession sw, PathGuard paths)
             return $"Exported BOM table {index} ({t.RowCount} rows incl. header) from {doc.GetTitle()} to {full}";
         }, ct);
     }
+
+    [McpServerTool(Name = "sw_renumber_bom_items", Title = "Renumber BOM items and balloons", Idempotent = true, OpenWorld = false)]
+    [Description("Renumber the item numbers of a drawing BOM table; balloons linked to it update to the new numbers. Number sequentially from startNumber, optionally after sorting by a column (e.g. PART NUMBER), or follow the assembly tree order. Returns the renumbered rows.")]
+    public Task<BomTableInfo> RenumberBomItems(
+        [Description("Which BOM table (index from sw_read_bom_tables). Default: the first.")] int index = 0,
+        [Description("First item number.")] int startNumber = 1,
+        [Description("Column title to sort rows by before renumbering, e.g. PART NUMBER. Omit to keep the row order.")] string? sortColumn = null,
+        [Description("Sort ascending (false = descending).")] bool ascending = true,
+        [Description("Number rows in the assembly's FeatureManager order instead (ignores sortColumn).")] bool followAssemblyOrder = false,
+        [Description("Path, file name or title of a drawing. Omit for the active document.")] string? document = null,
+        CancellationToken ct = default)
+    {
+        if (startNumber < 1)
+        {
+            throw new McpException("startNumber must be 1 or more.");
+        }
+        if (followAssemblyOrder && sortColumn is not null)
+        {
+            throw new McpException("Use either sortColumn or followAssemblyOrder, not both.");
+        }
+        return sw.RunOnDocumentAsync(document, (app, doc) =>
+        {
+            Documents.RequireType(doc, swDocumentTypes_e.swDocDRAWING, "BOM tables");
+            var tables = FindBomTables((DrawingDoc)doc);
+            if (tables.Count == 0)
+            {
+                throw new McpException("The drawing has no BOM table. Insert one with sw_insert_bom_table.");
+            }
+            if (index < 0 || index >= tables.Count)
+            {
+                throw new McpException($"index must be 0..{tables.Count - 1}.");
+            }
+            var (sheet, view, bom, table) = tables[index];
+            BomFeature f = bom.BomFeature ?? throw new McpException("The BOM table has no BOM feature.");
+            f.KeepCurrentItemNumbers = false;
+            f.SequenceStartNumber = startNumber;
+            f.FollowAssemblyOrder2 = followAssemblyOrder;
+            if (sortColumn is not null)
+            {
+                var titles = Enumerable.Range(0, table.ColumnCount).Select(c => (string?)table.GetColumnTitle2(c, false) ?? string.Empty).ToList();
+                int col = BomTableSpec.ColumnIndex(titles, sortColumn);
+                BomTableSortData sort = bom.GetBomTableSortData() ?? throw new McpException("SolidWorks returned no sort settings for the BOM table.");
+                sort.set_ColumnIndex(0, col); // primary sort key; secondary keys keep their saved settings
+                sort.set_Ascending(0, ascending);
+                sort.DoNotChangeItemNumber = false;
+                if (!bom.Sort(sort))
+                {
+                    throw new McpException($"SolidWorks could not sort the BOM table by '{titles[col]}'.");
+                }
+            }
+            doc.ForceRebuild3(false);
+            doc.GraphicsRedraw2();
+            var refreshed = FindBomTables((DrawingDoc)doc);
+            var t = index < refreshed.Count ? refreshed[index] : tables[index];
+            return Describe(index, t.Sheet, t.View, t.Bom, t.Table);
+        }, ct);
+    }
 }
