@@ -63,7 +63,7 @@ claude mcp add solidworks -e SWMCP_ALLOWED_ROOTS="D:\Engineering\Projects" -- C:
 | `SWMCP_STARTUP_TIMEOUT_SECONDS` | `180` | Max wait for a launched SolidWorks to finish starting. |
 | `SWMCP_COM_RETRY_TIMEOUT_SECONDS` | `60` | How long to retry calls SolidWorks rejects while busy. |
 
-## Tools (54)
+## Tools (60)
 
 Conventions: lengths in **mm**, angles in **degrees**, mass in **kg**. `document` accepts a full path, file name or window title; omit it to use the active document.
 
@@ -76,6 +76,7 @@ Conventions: lengths in **mm**, angles in **degrees**, mass in **kg**. `document
 | Assembly / BOM | `sw_get_component_tree`, `sw_get_bom` (`top_level` or `parts_only`, with chosen custom properties), `sw_insert_component`, `sw_add_mate` (coincident, concentric, parallel, perpendicular, tangent, distance, angle, lock), `sw_list_mates`, `sw_set_component_fixed` |
 | Modeling | `sw_create_sketch` (line, centerline, rectangles, circle, arc, polygon, slot, point), `sw_extrude`, `sw_cut_extrude`, `sw_revolve` (boss or cut, around a sketch centerline), `sw_fillet` (constant radius; edges by feature, whole part, or nearest point), `sw_chamfer` (equal distance, two distances, or distance + angle; same edge selection), `sw_hole_wizard` (ISO clearance, tapped, counterbore, countersink; many holes in one feature), `sw_list_edges`, `sw_list_features`, `sw_set_feature_suppression`, `sw_delete_feature`, `sw_list_dimensions`, `sw_set_dimension` |
 | Sheet metal | `sw_get_sheet_metal_info` (thickness, bend radius, K-factor, flattened state, cut-list flat size / area / cutting length / bends), `sw_base_flange` (closed or open profile), `sw_edge_flange`, `sw_set_flattened`, `sw_set_sheet_metal_parameters` |
+| Weldments | `sw_list_weldment_profiles` (standard / type / size from the SolidWorks Weldment Profiles folder), `sw_add_structural_member` (members along sketch lines, corner treatment, rotation), `sw_get_weldment_cut_list` (LENGTH, ANGLE1/2, quantity, material, mass per member group), `sw_trim_extend`, `sw_add_end_cap`, `sw_add_gusset` |
 | Equations | `sw_list_equations`, `sw_set_global_variable`, `sw_add_equation`, `sw_delete_equation` |
 | Drawings | `sw_create_drawing` (1st/3rd angle, isometric, import model dimensions), `sw_list_drawing_sheets`, `sw_activate_sheet` |
 | Macros | `sw_run_macro` (disabled by default) |
@@ -86,6 +87,7 @@ Conventions: lengths in **mm**, angles in **degrees**, mass in **kg**. `document
 - *"Export every sheet-metal part in D:\Projects\Cabinet\Parts to flat-pattern DXF in C:\Exports\Laser."*
 - *"Create a 600 × 400 × 3 mm plate on the top plane with four Ø9 mm holes 25 mm from each corner, set material AISI 304, and save it as C:\Work\plate.sldprt."*
 - *"Make a turned spacer: on the front plane sketch a 20 × 5 mm rectangle 10 mm from a vertical centerline, revolve it 360°, then fillet the outer circular edges R1."*
+- *"Build a 1200 × 600 mm table frame from ISO square tube 40 × 40 × 4 with mitred corners, add 5 mm end caps to the legs, and give me a saw cutting list with lengths and angles."*
 - *"Make a 2 mm sheet metal bracket: base flange from a 200 × 100 mm rectangle with R2 bends and K 0.44, add 40 mm 90° flanges on both long edges, then give me the flat blank size and bend count for a laser quote."*
 - *"Add four M6 counterbored holes through the top face of the base plate, 20 mm in from each corner."*
 - *"In LabBench.sldasm, fix Frame-1, then make the top plane of Top-1 coincident with the top plane of Frame-1 and mate its front plane 20 mm from Frame-1's front plane."*
@@ -118,11 +120,11 @@ Design decisions:
 
 ## Verification
 
-What is verified automatically (`dotnet test`, 205 tests, runs on Windows and Linux):
+What is verified automatically (`dotnet test`, 246 tests, runs on Windows and Linux):
 
 - Compiles against the real SolidWorks 2022 interop, so every API member and argument count used exists.
 - MCP end-to-end: the built server is launched over stdio, tools are listed with JSON schemas and annotations, errors are returned as tool errors and the server stays healthy.
-- Path allow-list (incl. `..` traversal and prefix tricks), configuration parsing, STA dispatcher (single thread, serialization, exceptions, cancellation), BOM aggregation, error-flag decoding, unit conversions, fillet/chamfer edge de-duplication and nearest-edge picking, chamfer parameter rules, mate type/alignment parsing, mate reference validation, component name matching, Hole Wizard type/size/depth rules and point-on-plane checks, sheet metal parameter/flange rules and cut-list number parsing.
+- Path allow-list (incl. `..` traversal and prefix tricks), configuration parsing, STA dispatcher (single thread, serialization, exceptions, cancellation), BOM aggregation, error-flag decoding, unit conversions, fillet/chamfer edge de-duplication and nearest-edge picking, chamfer parameter rules, mate type/alignment parsing, mate reference validation, component name matching, Hole Wizard type/size/depth rules and point-on-plane checks, sheet metal parameter/flange rules, cut-list number parsing, weldment profile library scanning/lookup, corner/trim/gusset option parsing and body/segment name matching.
 
 What still needs a SolidWorks workstation (recommended manual smoke test):
 
@@ -138,8 +140,9 @@ What still needs a SolidWorks workstation (recommended manual smoke test):
 10. In a two-part assembly: `sw_set_component_fixed` the first part → `sw_add_mate` coincident plane-to-plane (`feature: top`), then distance 20 mm, then concentric between two cylindrical faces picked by `entity: face` + `point` → `sw_list_mates`.
 11. On a 100 × 60 × 15 mm block: `sw_hole_wizard` counterbore M6 at two points on the top face, tapped M8 blind 20 mm (thread 15 mm), countersink M5 through all; compare the reported dimensions with the Hole Wizard PropertyManager.
 12. Sheet metal: `sw_create_sketch` a 200 × 100 rectangle on top → `sw_base_flange` 2 mm, R2, K 0.44 → `sw_list_edges` → `sw_edge_flange` 40 mm 90° on both long edges → `sw_get_sheet_metal_info` (compare bounding box and Bends with the Cut-List Properties dialog) → `sw_set_flattened` true/false → `sw_set_sheet_metal_parameters` thickness 3 → `sw_export_flat_pattern_dxf`.
+13. Weldment: `sw_list_weldment_profiles` → 3D or 2D sketch of a rectangular frame plus four vertical legs → `sw_add_structural_member` square tube for the frame (miter) and again for the legs → `sw_get_weldment_cut_list` (compare with the Cut-List Properties dialog) → `sw_trim_extend` the legs to the frame → `sw_add_end_cap` on the leg bottoms → `sw_add_gusset` in one corner.
 
-Known limitations / roadmap: no advanced/mechanical mates (width, symmetric, gear, slot, limit mates), vertex chamfers, variable-radius or face fillets, non-ISO Hole Wizard standards (ANSI, DIN, JIS...), sheet metal hems / miter flanges / sketched bends / gauge tables / convert-to-sheet-metal, thin revolves, or face selection yet; BOM is computed from the assembly tree (not from a drawing BOM table); `sw_insert_component` places components floating (fix or mate them afterwards).
+Known limitations / roadmap: no advanced/mechanical mates (width, symmetric, gear, slot, limit mates), vertex chamfers, variable-radius or face fillets, non-ISO Hole Wizard standards (ANSI, DIN, JIS...), sheet metal hems / miter flanges / sketched bends / gauge tables / convert-to-sheet-metal, weld beads / weld tables / polygonal or chamfered gussets / multiple member groups per feature, thin revolves, or face selection yet; BOM is computed from the assembly tree (not from a drawing BOM table); `sw_insert_component` places components floating (fix or mate them afterwards).
 
 ## Development
 

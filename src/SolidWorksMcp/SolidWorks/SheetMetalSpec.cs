@@ -73,40 +73,6 @@ public static class SheetMetalSpec
         _ => type.ToString(CultureInfo.InvariantCulture),
     };
 
-    /// <summary>
-    /// Cut-list values are text in document units, e.g. "250", "250.00", "1,250.5" or "250mm".
-    /// Returns the number, or null when the text is not numeric (e.g. "Yes" or an unresolved link).
-    /// </summary>
-    public static double? ParseCutListNumber(string? text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return null;
-        }
-        string t = text.Trim();
-        int end = 0;
-        while (end < t.Length && (char.IsDigit(t[end]) || t[end] is '.' or ',' or '-' or '+'))
-        {
-            end++;
-        }
-        if (end == 0)
-        {
-            return null;
-        }
-        string number = t[..end].Replace(",", string.Empty);
-        string rest = t[end..].Trim().ToLowerInvariant();
-        if (rest.Length > 0 && rest is not ("mm" or "in" or "kg" or "g" or "mm^2" or "mm²" or "m" or "\"" or "lb"))
-        {
-            return null;
-        }
-        return double.TryParse(number, NumberStyles.Float, CultureInfo.InvariantCulture, out double v) ? v : null;
-    }
-
-    /// <summary>Cut-list properties worth parsing into numbers for costing and nesting.</summary>
-    public static readonly string[] NumericCutListKeys =
-    {
-        "Bounding Box Length", "Bounding Box Width", "Sheet Metal Thickness", "Bounding Box Area",
-        "Bounding Box Area-Blank", "Cutting Length-Outer", "Cutting Length-Inner", "Cut Outs", "Bends",
-        "Bend Radius", "Mass", "Quantity",
-    };
+    /// <summary>Kept for callers of the original name; see <see cref="CutList.ParseNumber"/>.</summary>
+    public static double? ParseCutListNumber(string? text) => CutList.ParseNumber(text);
 }
