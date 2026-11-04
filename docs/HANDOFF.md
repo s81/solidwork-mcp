@@ -1,6 +1,6 @@
 # Hand-off — SolidWorks MCP server
 
-Last updated **2026-11-04**: release **v0.1.2** plus unreleased section and detail views. This is for the next session, which adds features.
+Last updated **2026-11-04**: preparing release **v0.1.3** (adds section and detail views). This is for the next session, which adds features.
 Working rules are in [`CLAUDE.md`](../CLAUDE.md).
 
 ## 1. Where things stand
