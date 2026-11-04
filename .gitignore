@@ -7,3 +7,6 @@ TestResults/
 publish/
 artifacts/
 release/
+signing/
+*.pfx
+*.pfx.b64

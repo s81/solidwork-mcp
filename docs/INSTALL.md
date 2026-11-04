@@ -77,14 +77,50 @@ With SolidWorks open, ask Claude:
 | Symptom | Cause / fix |
 |---|---|
 | Server doesn't show in Claude | Invalid JSON (check the `\\` and the commas), wrong path in `command`, or Claude wasn't fully restarted. Claude Desktop logs: `%APPDATA%\Claude\logs\mcp-server-solidworks.log`. |
-| "Windows protected your PC" | The exe isn't code-signed. Unblock the zip before extracting (step 2.2), or ask IT to allow `SolidWorksMcp.exe`. |
+| "Windows protected your PC" | The exe has no public code-signing certificate (see **Code signing** below). Unblock the zip before extracting (step 2.2), or ask IT to trust the signing certificate or allow `SolidWorksMcp.exe`. |
 | Framework zip: "You must install .NET" | Install the .NET 8 Runtime x64, or use the self-contained zip. |
 | "Could not connect to SolidWorks" | SolidWorks isn't installed, licensed or activated for this Windows user, or `SWMCP_ATTACH_ONLY=true` and SolidWorks isn't open. Start SolidWorks once by hand and close any licence dialogs. |
 | Calls time out while SolidWorks shows a dialog | Close the dialog. The server retries for `SWMCP_COM_RETRY_TIMEOUT_SECONDS`. |
 | "outside the allowed folders" | Add that folder to `SWMCP_ALLOWED_ROOTS` and restart Claude. |
 | Claude and SolidWorks run as different users / elevation | COM can't cross user or elevation boundaries. Run both as the same user, and either both elevated or neither (not "Run as administrator" for only one). |
 
-## 7. Update / uninstall
+## 7. Code signing
+
+When a release is signed, `SolidWorksMcp.exe` carries an Authenticode signature (SHA-256, timestamped) from the project's **self-signed, internal** certificate. The release notes give the certificate's thumbprint, and each zip, as well as the release page, contains the public certificate `SolidWorksMcp-signing.cer`.
+
+Because the certificate is self-signed, Windows treats the signature as **untrusted** until IT deploys the certificate. After deployment, Windows shows the publisher as verified, and IT can allow the exe with an AppLocker or WDAC *publisher* rule instead of a file-hash rule. SmartScreen may still warn about a newly downloaded file, because a self-signed certificate has no public reputation. Unblocking the zip (step 2.2) still applies.
+
+### Check a signature (anyone)
+
+```powershell
+Get-AuthenticodeSignature C:\Tools\solidworks-mcp\SolidWorksMcp.exe | Format-List Status, StatusMessage, SignerCertificate
+```
+
+The `SignerCertificate` thumbprint must equal the one in the release notes. Before IT deploys the certificate, `Status` reads `UnknownError` ("…root certificate which is not trusted"); after, it reads `Valid`.
+
+### Trusting the signature (IT)
+
+1. Check that the thumbprint of `SolidWorksMcp-signing.cer` matches the release notes: `(Get-PfxCertificate .\SolidWorksMcp-signing.cer).Thumbprint`.
+2. Deploy it to **Trusted Root Certification Authorities** and **Trusted Publishers** on the PCs that run the server:
+   - **Group Policy** (domain): *Computer Configuration → Policies → Windows Settings → Security Settings → Public Key Policies* → import the `.cer` under both **Trusted Root Certification Authorities** and **Trusted Publishers**.
+   - **One PC** (elevated PowerShell):
+     ```powershell
+     Import-Certificate .\SolidWorksMcp-signing.cer -CertStoreLocation Cert:\LocalMachine\Root
+     Import-Certificate .\SolidWorksMcp-signing.cer -CertStoreLocation Cert:\LocalMachine\TrustedPublisher
+     ```
+3. Trust this certificate **only** for this project, and remove it if its private key is ever lost or leaked.
+
+### Enabling signing (maintainer)
+
+1. On a trusted Windows PC run `pwsh build/new-signing-cert.ps1`. It creates the certificate (RSA 3072, valid 5 years by default) and prints the thumbprint.
+2. In GitHub go to **Settings → Secrets and variables → Actions** and add:
+   - `SIGNING_CERT_PFX_BASE64`: the contents of `signing/solidworks-mcp-signing.pfx.b64`
+   - `SIGNING_CERT_PASSWORD`: the password you chose
+3. Delete the `.b64` file and keep the `.pfx` offline. The `signing/` folder is git-ignored.
+
+From then on, every release run signs both exes, checks that each signature is valid and timestamped, and publishes `SolidWorksMcp-signing.cer`. Without the secrets, releases are built unsigned and the run shows a warning.
+
+## 8. Update / uninstall
 
 - **Update:** quit Claude, replace the folder contents with the new zip, and start Claude again.
 - **Uninstall:** remove the `solidworks` entry from the Claude config and delete the folder. Nothing is written to the registry.

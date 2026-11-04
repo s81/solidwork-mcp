@@ -30,9 +30,32 @@ jobs:
           if ($proj -ne $v) { throw "Release version $v does not match <Version>$proj</Version> in SolidWorksMcp.csproj. Bump the csproj first." }
           "VERSION=$v" >> $env:GITHUB_ENV
       - run: dotnet test -c Release
+      - name: Signing certificate
+        shell: pwsh
+        env:
+          PFX_B64: ${{ secrets.SIGNING_CERT_PFX_BASE64 }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:PFX_B64)) {
+            $msg = 'SIGNING_CERT_PFX_BASE64 is not set: this release is NOT code-signed. See INSTALL.md (Code signing) to enable it.'
+            "::warning title=Unsigned release::$msg"
+            "> [!WARNING]`n> $msg" >> $env:GITHUB_STEP_SUMMARY
+            exit 0
+          }
+          $path = Join-Path $env:RUNNER_TEMP 'signing.pfx'
+          [IO.File]::WriteAllBytes($path, [Convert]::FromBase64String($env:PFX_B64.Trim()))
+          "SIGNING_CERT_PATH=$path" >> $env:GITHUB_ENV
       - name: Package
         shell: pwsh
-        run: ./build/package.ps1 -Version $env:VERSION
+        env:
+          SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
+        run: |
+          $pkg = @{ Version = $env:VERSION }
+          if ($env:SIGNING_CERT_PATH) { $pkg.SigningCertPath = $env:SIGNING_CERT_PATH; $pkg.TrustOnThisMachine = $true }
+          ./build/package.ps1 @pkg
+      - name: Remove signing certificate
+        if: always()
+        shell: pwsh
+        run: if ($env:SIGNING_CERT_PATH) { Remove-Item $env:SIGNING_CERT_PATH -Force -ErrorAction SilentlyContinue }
       - name: Smoke test (self-contained)
         shell: pwsh
         run: ./build/smoke-test.ps1 -Exe "artifacts/solidworks-mcp-$env:VERSION-win-x64/SolidWorksMcp.exe" -ExpectedVersion $env:VERSION
@@ -45,6 +68,8 @@ jobs:
           path: |
             artifacts/*.zip
             artifacts/SHA256SUMS.txt
+            artifacts/SolidWorksMcp-signing.cer
+          if-no-files-found: error
       - name: GitHub Release
         if: github.ref_type == 'tag' || inputs.publish
         shell: pwsh
@@ -53,6 +78,17 @@ jobs:
         run: |
           # On a manual run the tag does not exist yet: gh creates v<version> on the commit this run built.
           $tag = "v$env:VERSION"
-          gh release create $tag (Get-ChildItem artifacts/*.zip).FullName artifacts/SHA256SUMS.txt `
-            --target '${{ github.sha }}' --title "SolidWorks MCP $env:VERSION" --notes-file docs/RELEASE_NOTES.md
+          $notes = Join-Path $env:RUNNER_TEMP 'notes.md'
+          $assets = @((Get-ChildItem artifacts/*.zip).FullName) + 'artifacts/SHA256SUMS.txt'
+          $body = Get-Content docs/RELEASE_NOTES.md -Raw
+          if (Test-Path artifacts/signing-thumbprint.txt) {
+            $thumb = Get-Content artifacts/signing-thumbprint.txt -Raw
+            $assets += 'artifacts/SolidWorksMcp-signing.cer'
+            $body += "`n## Code signing`n`n``SolidWorksMcp.exe`` is signed with the project's **self-signed, internal** certificate (SHA-256, timestamped). Thumbprint: ``$thumb``. Windows shows it as untrusted until IT deploys ``SolidWorksMcp-signing.cer``; see ``INSTALL.md``.`n"
+          } else {
+            $body += "`n## Code signing`n`nThis release is **not code-signed**.`n"
+          }
+          Set-Content $notes $body -Encoding utf8
+          gh release create $tag @assets `
+            --target '${{ github.sha }}' --title "SolidWorks MCP $env:VERSION" --notes-file $notes
           if ($LASTEXITCODE -ne 0) { throw "gh release create failed" }
