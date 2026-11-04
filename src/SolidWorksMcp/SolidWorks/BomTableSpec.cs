@@ -99,4 +99,16 @@ public static class BomTableSpec
         }
         return rows;
     }
+
+    /// <summary>Index of the column whose title matches (case- and whitespace-insensitive).</summary>
+    public static int ColumnIndex(IReadOnlyList<string> titles, string column)
+    {
+        static string Norm(string s) => string.Join(' ', s.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)).ToUpperInvariant();
+        string want = Norm(column);
+        for (int i = 0; i < titles.Count; i++)
+        {
+            if (Norm(titles[i]) == want) return i;
+        }
+        throw new McpException($"No BOM column '{column}'. Columns: {string.Join(", ", titles.Where(t => t.Length > 0))}.");
+    }
 }

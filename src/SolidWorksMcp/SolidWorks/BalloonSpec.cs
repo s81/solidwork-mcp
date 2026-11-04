@@ -27,6 +27,7 @@ public static class BalloonSpec
         ["diamond"] = swBalloonStyle_e.swBS_Diamond,
         ["pentagon"] = swBalloonStyle_e.swBS_Pentagon,
         ["square"] = swBalloonStyle_e.swBS_Square,
+        ["split_square"] = swBalloonStyle_e.swBS_SplitSquare,
         ["underline"] = swBalloonStyle_e.swBS_Underline,
         ["none"] = swBalloonStyle_e.swBS_None,
     };
@@ -79,4 +80,75 @@ public static class BalloonSpec
     }
 
     public static bool IsSplit(swBalloonStyle_e style) => style is swBalloonStyle_e.swBS_SplitCirc or swBalloonStyle_e.swBS_SplitSquare;
+
+    public static swStackedBalloonDirection_e ParseStackDirection(string? direction) => (direction ?? "right").Trim().ToLowerInvariant() switch
+    {
+        "up" => swStackedBalloonDirection_e.swStackedBalloonDir_Up,
+        "down" => swStackedBalloonDirection_e.swStackedBalloonDir_Down,
+        "left" => swStackedBalloonDirection_e.swStackedBalloonDir_Left,
+        "right" => swStackedBalloonDirection_e.swStackedBalloonDir_Right,
+        var d => throw new McpException($"Unknown stack direction '{d}'. Use up, down, left or right."),
+    };
+
+    /// <summary>How Auto Balloon numbers items when the drawing has no BOM table yet.</summary>
+    public static swBalloonItemNumbersOrder_e ParseItemOrder(string? order) => (order ?? "keep").Trim().ToLowerInvariant() switch
+    {
+        "keep" or "do_not_change" => swBalloonItemNumbersOrder_e.swBalloonItemNumbers_DoNotChangeItemNumbers,
+        "assembly_order" or "follow_assembly_order" => swBalloonItemNumbersOrder_e.swBalloonItemNumbers_FollowAssemblyOrder,
+        "sequential" or "order_sequentially" => swBalloonItemNumbersOrder_e.swBalloonItemNumbers_OrderSequentially,
+        var o => throw new McpException($"Unknown item order '{o}'. Use keep, assembly_order or sequential."),
+    };
+
+    public static void RequireItemNumbering(int start, int increment)
+    {
+        if (start < 1) throw new McpException("itemNumberStart must be 1 or more.");
+        if (increment < 1) throw new McpException("itemNumberIncrement must be 1 or more.");
+    }
+
+    /// <summary>
+    /// Picks balloons (by list position) from one view's balloon upper texts. Exactly one of
+    /// <paramref name="itemNumbers"/> (matched against the upper text), <paramref name="indices"/> (from sw_list_balloons)
+    /// or <paramref name="all"/> must be used. Every requested item must exist.
+    /// </summary>
+    public static List<int> Pick(IReadOnlyList<string> upperTexts, string[]? itemNumbers, int[]? indices, bool all)
+    {
+        int modes = (itemNumbers is { Length: > 0 } ? 1 : 0) + (indices is { Length: > 0 } ? 1 : 0) + (all ? 1 : 0);
+        if (modes != 1)
+        {
+            throw new McpException("Give exactly one of itemNumbers, indices or all=true.");
+        }
+        if (all)
+        {
+            return Enumerable.Range(0, upperTexts.Count).ToList();
+        }
+        var picked = new List<int>();
+        if (indices is { Length: > 0 })
+        {
+            foreach (int i in indices.Distinct())
+            {
+                if (i < 0 || i >= upperTexts.Count)
+                {
+                    throw new McpException($"Balloon index {i} is out of range; the view has {upperTexts.Count} balloon(s) (0..{upperTexts.Count - 1}).");
+                }
+                picked.Add(i);
+            }
+            return picked;
+        }
+        foreach (string item in itemNumbers!.Select(x => x.Trim()).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var hits = Enumerable.Range(0, upperTexts.Count).Where(i => string.Equals(upperTexts[i].Trim(), item, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (hits.Count == 0)
+            {
+                throw new McpException($"No balloon with text '{item}' in this view. Balloons: {string.Join(", ", upperTexts.Distinct())}.");
+            }
+            picked.AddRange(hits);
+        }
+        return picked.Distinct().ToList();
+    }
+
+    /// <summary>Evenly spaced attachment positions 0..1 along a magnetic line (a single note goes in the middle).</summary>
+    public static double[] LinePositions(int count)
+        => count <= 0 ? Array.Empty<double>()
+           : count == 1 ? new[] { 0.5 }
+           : Enumerable.Range(0, count).Select(i => (double)i / (count - 1)).ToArray();
 }
