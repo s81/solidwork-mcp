@@ -139,33 +139,12 @@ public sealed class FeatureTools(SolidWorksSession sw)
         {
             throw new McpException("radius must be > 0 mm.");
         }
-        string mode = selection.Trim().ToLowerInvariant();
-        if (mode is not ("feature" or "all" or "points"))
-        {
-            throw new McpException("selection must be feature, all or points.");
-        }
-        if (mode == "feature" && string.IsNullOrWhiteSpace(feature))
-        {
-            throw new McpException("selection 'feature' requires 'feature'.");
-        }
-        if (mode == "points" && (points is null || points.Length == 0))
-        {
-            throw new McpException("selection 'points' requires at least one point.");
-        }
+        string mode = ValidateSelection(selection, feature, points);
 
         return sw.RunOnDocumentAsync<object>(document, (app, doc) =>
         {
             Documents.RequireType(doc, swDocumentTypes_e.swDocPART, "Fillet");
-            List<EdgeGeometry> edges = mode switch
-            {
-                "feature" => EdgeSelector.Collect(doc, feature, kind),
-                "all" => EdgeSelector.Collect(doc, null, kind),
-                _ => EdgeSelector.Nearest(EdgeSelector.Collect(doc, feature), points!, toleranceMm, EdgeSelector.ComDistanceMm),
-            };
-            if (edges.Count == 0)
-            {
-                throw new McpException("No edges matched the selection.");
-            }
+            List<EdgeGeometry> edges = ResolveEdges(doc, mode, feature, points, kind, toleranceMm);
 
             var data = doc.FeatureManager.CreateDefinition((int)swFeatureNameID_e.swFmFillet) as SimpleFilletFeatureData2
                 ?? throw new McpException("SolidWorks did not return a fillet definition.");
@@ -182,6 +161,129 @@ public sealed class FeatureTools(SolidWorksSession sw)
                 throw new McpException($"Fillet of {edges.Count} edge(s) at R{radius} mm failed. The radius may be too large for an adjacent face; try a smaller radius or fewer edges.");
             }
             return FeatureResult(feat, name, new { radiusMm = radius, edgeCount = edges.Count });
+        }, ct);
+    }
+
+    internal static string ValidateSelection(string selection, string? feature, double[][]? points)
+    {
+        string mode = selection.Trim().ToLowerInvariant();
+        if (mode is not ("feature" or "all" or "points"))
+        {
+            throw new McpException("selection must be feature, all or points.");
+        }
+        if (mode == "feature" && string.IsNullOrWhiteSpace(feature))
+        {
+            throw new McpException("selection 'feature' requires 'feature'.");
+        }
+        if (mode == "points" && (points is null || points.Length == 0))
+        {
+            throw new McpException("selection 'points' requires at least one point.");
+        }
+        return mode;
+    }
+
+    private static List<EdgeGeometry> ResolveEdges(ModelDoc2 doc, string mode, string? feature, double[][]? points, string kind, double toleranceMm)
+    {
+        List<EdgeGeometry> edges = mode switch
+        {
+            "feature" => EdgeSelector.Collect(doc, feature, kind),
+            "all" => EdgeSelector.Collect(doc, null, kind),
+            _ => EdgeSelector.Nearest(EdgeSelector.Collect(doc, feature), points!, toleranceMm, EdgeSelector.ComDistanceMm),
+        };
+        if (edges.Count == 0)
+        {
+            throw new McpException("No edges matched the selection.");
+        }
+        return edges;
+    }
+
+    internal static (swChamferType_e Type, double Width, double Angle, double OtherDist) ChamferParameters(
+        string type, double distance, double? distance2, double angleDegrees)
+    {
+        if (distance <= 0)
+        {
+            throw new McpException("distance must be > 0 mm.");
+        }
+        switch (type.Trim().ToLowerInvariant().Replace('-', '_'))
+        {
+            case "equal_distance" or "equal":
+                // Distance-distance with both sides equal: the long-standing equivalent of the newer swChamferEqualDistance type.
+                return (swChamferType_e.swChamferDistanceDistance, Units.MmToM(distance), 0, Units.MmToM(distance));
+            case "distance_distance":
+                if (distance2 is not > 0)
+                {
+                    throw new McpException("type distance_distance requires distance2 > 0 mm.");
+                }
+                return (swChamferType_e.swChamferDistanceDistance, Units.MmToM(distance), 0, Units.MmToM(distance2.Value));
+            case "angle_distance":
+                if (angleDegrees <= 0 || angleDegrees >= 90)
+                {
+                    throw new McpException("angleDegrees must be between 0 and 90 (exclusive).");
+                }
+                return (swChamferType_e.swChamferAngleDistance, Units.MmToM(distance), Units.DegToRad(angleDegrees), 0);
+            default:
+                throw new McpException($"Unknown chamfer type '{type}'. Use equal_distance, distance_distance or angle_distance.");
+        }
+    }
+
+    [McpServerTool(Name = "sw_chamfer", Title = "Chamfer edges", OpenWorld = false)]
+    [Description("Bevel edges with a chamfer: equal distance (e.g. 1 x 45 deg), two distances, or distance + angle. Choose edges like sw_fillet: 'feature' (all edges of a feature, optionally only lines or circles), 'all' (every edge of the part), or 'points' (the edge nearest each [x,y,z] mm point; use midpoints from sw_list_edges).")]
+    public Task<object> Chamfer(
+        [Description("Chamfer distance in mm (first distance for distance_distance; the distance for angle_distance).")] double distance,
+        [Description("feature | all | points")] string selection,
+        [Description("equal_distance | distance_distance | angle_distance")] string type = "equal_distance",
+        [Description("Second distance in mm (distance_distance only).")] double? distance2 = null,
+        [Description("Angle in degrees, 0-90 exclusive (angle_distance only).")] double angleDegrees = 45,
+        [Description("Swap which face each distance (or the angle) is measured on. Applies to distance_distance and angle_distance.")] bool flip = false,
+        [Description("Feature whose edges to chamfer (selection 'feature'), e.g. Boss-Extrude1.")] string? feature = null,
+        [Description("Points in mm, one per edge (selection 'points'), e.g. [[50,25,10],[-50,25,10]].")] double[][]? points = null,
+        [Description("Only edges of this kind: any | line | circle | other (selections 'feature' and 'all').")] string kind = "any",
+        [Description("Max distance in mm from a point to its edge (selection 'points').")] double toleranceMm = 0.5,
+        [Description("Also chamfer edges tangent to the selected ones.")] bool tangentPropagation = true,
+        [Description("Optional name for the new feature.")] string? name = null,
+        [Description("Path, file name or title of a part. Omit for the active document.")] string? document = null,
+        CancellationToken ct = default)
+    {
+        var (chamferType, width, angle, otherDist) = ChamferParameters(type, distance, distance2, angleDegrees);
+        string mode = ValidateSelection(selection, feature, points);
+
+        return sw.RunOnDocumentAsync<object>(document, (app, doc) =>
+        {
+            Documents.RequireType(doc, swDocumentTypes_e.swDocPART, "Chamfer");
+            List<EdgeGeometry> edges = ResolveEdges(doc, mode, feature, points, kind, toleranceMm);
+
+            // IFeatureManager::InsertFeatureChamfer acts on the current selection, so select the edges first (mark 0).
+            doc.ClearSelection2(true);
+            SelectData sd = ((SelectionMgr)doc.SelectionManager).CreateSelectData();
+            sd.Mark = 0;
+            for (int i = 0; i < edges.Count; i++)
+            {
+                if (edges[i].Com is not Entity entity || !entity.Select4(i > 0, sd))
+                {
+                    doc.ClearSelection2(true);
+                    throw new McpException($"Could not select edge {i} (mid point [{string.Join(", ", edges[i].MidMm)}] mm).");
+                }
+            }
+
+            int options = 0;
+            if (flip) options |= (int)swFeatureChamferOption_e.swFeatureChamferFlipDirection;
+            if (tangentPropagation) options |= (int)swFeatureChamferOption_e.swFeatureChamferTangentPropagation;
+
+            // InsertFeatureChamfer(Options, ChamferType, Width, Angle, OtherDist, VertexChamDist1..3); vertex distances unused for edge chamfers.
+            var feat = doc.FeatureManager.InsertFeatureChamfer(options, (int)chamferType, width, angle, otherDist, 0, 0, 0);
+            doc.ClearSelection2(true);
+            if (feat is null)
+            {
+                throw new McpException($"Chamfer of {edges.Count} edge(s) failed. The distance may be larger than an adjacent face allows; try a smaller value or fewer edges.");
+            }
+            return FeatureResult(feat, name, new
+            {
+                type = type.Trim().ToLowerInvariant(),
+                distanceMm = distance,
+                distance2Mm = chamferType == swChamferType_e.swChamferDistanceDistance ? Units.Round(Units.MToMm(otherDist)) : (double?)null,
+                angleDegrees = chamferType == swChamferType_e.swChamferAngleDistance ? angleDegrees : (double?)null,
+                edgeCount = edges.Count,
+            });
         }, ct);
     }
 
