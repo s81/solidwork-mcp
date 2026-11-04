@@ -28,7 +28,7 @@ public class McpProtocolTests
         Assert.Contains("millimetres", client.ServerInstructions ?? string.Empty);
 
         var tools = await client.ListToolsAsync();
-        Assert.True(tools.Count >= 49, $"only {tools.Count} tools");
+        Assert.True(tools.Count >= 54, $"only {tools.Count} tools");
         var sketch = tools.Single(t => t.Name == "sw_create_sketch");
         string schema = sketch.JsonSchema.GetRawText();
         Assert.Contains("\"entities\"", schema);
@@ -84,6 +84,25 @@ public class McpProtocolTests
         {
             ["type"] = type, ["size"] = size, ["endCondition"] = end, ["points"] = new[] { new[] { 0.0, 0, 10 } },
         });
+        Assert.True(result.IsError);
+        Assert.Contains(expected, Text(result));
+    }
+
+    [Theory]
+    [InlineData("sw_base_flange", "kFactor", 1.5, "kFactor must be")]
+    [InlineData("sw_base_flange", "thicknessMm", 0.0, "thicknessMm must be")]
+    [InlineData("sw_edge_flange", "angleDegrees", 200.0, "angleDegrees must be")]
+    [InlineData("sw_set_sheet_metal_parameters", "kFactor", 0.0, "kFactor must be")]
+    public async Task SheetMetalToolsValidateBeforeTouchingSolidWorks(string tool, string arg, double value, string expected)
+    {
+        await using var client = await StartAsync();
+        var args = new Dictionary<string, object?>
+        {
+            ["sketch"] = "Sketch1", ["thicknessMm"] = 2.0, ["bendRadiusMm"] = 1.0, ["lengthMm"] = 20.0,
+            ["points"] = new[] { new[] { 0.0, 0, 0 } },
+        };
+        args[arg] = value;
+        var result = await client.CallToolAsync(tool, args);
         Assert.True(result.IsError);
         Assert.Contains(expected, Text(result));
     }
