@@ -10,6 +10,7 @@ internal static class ServerInstructions
         - Sketch coordinates are 2D in the sketch plane, relative to the part origin.
         - Planes may be given as front/top/right or by feature name.
         - Call sw_connect first if unsure SolidWorks is running. Changes are not saved until sw_save_document.
+        - Revolve needs a closed profile plus one centerline in the same sketch. For fillets, use sw_list_edges and pass edge midpoints as points.
         - Prefer sw_list_features / sw_list_dimensions before editing so you use real feature and dimension names.
         """;
 }

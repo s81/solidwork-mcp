@@ -63,7 +63,7 @@ claude mcp add solidworks -e SWMCP_ALLOWED_ROOTS="D:\Engineering\Projects" -- C:
 | `SWMCP_STARTUP_TIMEOUT_SECONDS` | `180` | Max wait for a launched SolidWorks to finish starting. |
 | `SWMCP_COM_RETRY_TIMEOUT_SECONDS` | `60` | How long to retry calls SolidWorks rejects while busy. |
 
-## Tools (41)
+## Tools (44)
 
 Conventions: lengths in **mm**, angles in **degrees**, mass in **kg**. `document` accepts a full path, file name or window title; omit it to use the active document.
 
@@ -74,7 +74,7 @@ Conventions: lengths in **mm**, angles in **degrees**, mass in **kg**. `document
 | Export | `sw_export` (STEP AP203/214/242, IGES, Parasolid, SAT, STL, 3MF, IFC, PDF, DXF/DWG, eDrawings, JPG/TIF/PNG), `sw_export_flat_pattern_dxf` (sheet metal), `sw_batch_export` (whole folder, incl. `flat-dxf`) |
 | Properties | `sw_get_custom_properties`, `sw_set_custom_property`, `sw_delete_custom_property`, `sw_get_mass_properties`, `sw_get_material`, `sw_set_material`, `sw_list_configurations`, `sw_activate_configuration` |
 | Assembly / BOM | `sw_get_component_tree`, `sw_get_bom` (`top_level` or `parts_only`, with chosen custom properties), `sw_insert_component` |
-| Modeling | `sw_create_sketch` (line, centerline, rectangles, circle, arc, polygon, slot, point), `sw_extrude`, `sw_cut_extrude`, `sw_list_features`, `sw_set_feature_suppression`, `sw_delete_feature`, `sw_list_dimensions`, `sw_set_dimension` |
+| Modeling | `sw_create_sketch` (line, centerline, rectangles, circle, arc, polygon, slot, point), `sw_extrude`, `sw_cut_extrude`, `sw_revolve` (boss or cut, around a sketch centerline), `sw_fillet` (constant radius; edges by feature, whole part, or nearest point), `sw_list_edges`, `sw_list_features`, `sw_set_feature_suppression`, `sw_delete_feature`, `sw_list_dimensions`, `sw_set_dimension` |
 | Equations | `sw_list_equations`, `sw_set_global_variable`, `sw_add_equation`, `sw_delete_equation` |
 | Drawings | `sw_create_drawing` (1st/3rd angle, isometric, import model dimensions), `sw_list_drawing_sheets`, `sw_activate_sheet` |
 | Macros | `sw_run_macro` (disabled by default) |
@@ -84,6 +84,7 @@ Conventions: lengths in **mm**, angles in **degrees**, mass in **kg**. `document
 - *"Open D:\Projects\LabBench\LabBench.sldasm and give me a parts-only BOM with PartNo, Description and Material as a table."*
 - *"Export every sheet-metal part in D:\Projects\Cabinet\Parts to flat-pattern DXF in C:\Exports\Laser."*
 - *"Create a 600 × 400 × 3 mm plate on the top plane with four Ø9 mm holes 25 mm from each corner, set material AISI 304, and save it as C:\Work\plate.sldprt."*
+- *"Make a turned spacer: on the front plane sketch a 20 × 5 mm rectangle 10 mm from a vertical centerline, revolve it 360°, then fillet the outer circular edges R1."*
 - *"Set global variable Width to 1500 in the desk assembly, rebuild, and report the new mass."*
 - *"Make a first-angle A3 drawing of bracket.sldprt with an isometric view and export it to PDF."*
 
@@ -113,11 +114,11 @@ Design decisions:
 
 ## Verification
 
-What is verified automatically (`dotnet test`, 68 tests, runs on Windows and Linux):
+What is verified automatically (`dotnet test`, 83 tests, runs on Windows and Linux):
 
 - Compiles against the real SolidWorks 2022 interop, so every API member and argument count used exists.
 - MCP end-to-end: the built server is launched over stdio, tools are listed with JSON schemas and annotations, errors are returned as tool errors and the server stays healthy.
-- Path allow-list (incl. `..` traversal and prefix tricks), configuration parsing, STA dispatcher (single thread, serialization, exceptions, cancellation), BOM aggregation, error-flag decoding, unit conversions.
+- Path allow-list (incl. `..` traversal and prefix tricks), configuration parsing, STA dispatcher (single thread, serialization, exceptions, cancellation), BOM aggregation, error-flag decoding, unit conversions, fillet edge de-duplication and nearest-edge picking.
 
 What still needs a SolidWorks workstation (recommended manual smoke test):
 
@@ -127,8 +128,10 @@ What still needs a SolidWorks workstation (recommended manual smoke test):
 4. Open a real assembly → `sw_get_bom` and compare with a drawing BOM table.
 5. `sw_export_flat_pattern_dxf` on a sheet-metal part; check bend lines in the DXF.
 6. `sw_create_drawing` first-angle → `sw_export` PDF.
+7. Sketch a closed profile plus a `centerline` → `sw_revolve` 360° and 90°, then `cut: true`.
+8. `sw_list_edges` on an extrude → `sw_fillet` with `selection: points` (edge midpoints), then `selection: feature, kind: circle`.
 
-Known limitations / roadmap: no mates, revolve, fillet/chamfer, hole wizard, or edge/face selection yet; BOM is computed from the assembly tree (not from a drawing BOM table); `sw_insert_component` places components floating.
+Known limitations / roadmap: no mates, chamfer, variable-radius or face fillets, hole wizard, thin revolves, or face selection yet; BOM is computed from the assembly tree (not from a drawing BOM table); `sw_insert_component` places components floating.
 
 ## Development
 
