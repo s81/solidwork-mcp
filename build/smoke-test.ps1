@@ -5,7 +5,7 @@
 #>
 param(
     [Parameter(Mandatory = $true)][string]$Exe,
-    [int]$MinTools = 81,
+    [int]$MinTools = 84,
     [string]$ExpectedVersion
 )
 $ErrorActionPreference = 'Stop'
