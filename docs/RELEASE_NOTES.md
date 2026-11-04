@@ -1,11 +1,10 @@
 SolidWorks MCP server for **SolidWorks 2022 or newer** on Windows x64: 81 tools over stdio, built with .NET 8 and the official MCP C# SDK.
 
-## What's new in 0.1.1
+## What's new in 0.1.2
 
-- **Licence:** the project is MIT-licensed (© 2026 Samer William Al-Haddadin). Each zip now includes `LICENSE.txt` and `THIRD-PARTY-NOTICES.md`, which lists the licences of the bundled MCP SDK, .NET and SolidWorks interop components.
-- **Server version:** the version reported to MCP clients now comes from the build, so it always matches the release. The release smoke test checks this.
-- **Build pipeline:** the GitHub Actions now run on Node 24, and a release can be published from a manual workflow run.
-- The tools are unchanged from 0.1.0.
+- **Code signing:** release builds can now Authenticode-sign `SolidWorksMcp.exe`, using SHA-256 with a timestamp and the project's self-signed internal certificate. Each signed release includes the public certificate `SolidWorksMcp-signing.cer`. The **Code signing** section at the end of these notes says whether this release is signed and gives the certificate thumbprint. `INSTALL.md` explains how to check a signature and how IT can trust it.
+- **Release maintenance:** a new **Mark release superseded** workflow flags older releases and points them to the newer one.
+- The tools are unchanged from 0.1.1.
 
 ## Downloads
 
