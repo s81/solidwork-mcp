@@ -28,7 +28,7 @@ public class McpProtocolTests
         Assert.Contains("millimetres", client.ServerInstructions ?? string.Empty);
 
         var tools = await client.ListToolsAsync();
-        Assert.True(tools.Count >= 48, $"only {tools.Count} tools");
+        Assert.True(tools.Count >= 49, $"only {tools.Count} tools");
         var sketch = tools.Single(t => t.Name == "sw_create_sketch");
         string schema = sketch.JsonSchema.GetRawText();
         Assert.Contains("\"entities\"", schema);
@@ -69,6 +69,21 @@ public class McpProtocolTests
         await using var client = await StartAsync();
         var refs = Enumerable.Range(1, count).Select(i => new Dictionary<string, object?> { ["component"] = $"Part-{i}" }).ToArray();
         var result = await client.CallToolAsync("sw_add_mate", new Dictionary<string, object?> { ["type"] = type, ["references"] = refs });
+        Assert.True(result.IsError);
+        Assert.Contains(expected, Text(result));
+    }
+
+    [Theory]
+    [InlineData("tapped", "6mm", "through_all", "not an ISO metric size")]
+    [InlineData("counterbore", "M6", "blind", "requires depthMm")]
+    [InlineData("pocket", "M6", "through_all", "Unknown hole type")]
+    public async Task HoleWizardValidatesBeforeTouchingSolidWorks(string type, string size, string end, string expected)
+    {
+        await using var client = await StartAsync();
+        var result = await client.CallToolAsync("sw_hole_wizard", new Dictionary<string, object?>
+        {
+            ["type"] = type, ["size"] = size, ["endCondition"] = end, ["points"] = new[] { new[] { 0.0, 0, 10 } },
+        });
         Assert.True(result.IsError);
         Assert.Contains(expected, Text(result));
     }
