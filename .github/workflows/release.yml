@@ -26,6 +26,8 @@ jobs:
         run: |
           $v = if ('${{ github.ref_type }}' -eq 'tag') { '${{ github.ref_name }}'.TrimStart('v') } else { '${{ inputs.version }}' }
           if ($v -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw "Invalid version '$v'" }
+          $proj = ([xml](Get-Content src/SolidWorksMcp/SolidWorksMcp.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          if ($proj -ne $v) { throw "Release version $v does not match <Version>$proj</Version> in SolidWorksMcp.csproj. Bump the csproj first." }
           "VERSION=$v" >> $env:GITHUB_ENV
       - run: dotnet test -c Release
       - name: Package
@@ -33,10 +35,10 @@ jobs:
         run: ./build/package.ps1 -Version $env:VERSION
       - name: Smoke test (self-contained)
         shell: pwsh
-        run: ./build/smoke-test.ps1 -Exe "artifacts/solidworks-mcp-$env:VERSION-win-x64/SolidWorksMcp.exe"
+        run: ./build/smoke-test.ps1 -Exe "artifacts/solidworks-mcp-$env:VERSION-win-x64/SolidWorksMcp.exe" -ExpectedVersion $env:VERSION
       - name: Smoke test (framework-dependent)
         shell: pwsh
-        run: ./build/smoke-test.ps1 -Exe "artifacts/solidworks-mcp-$env:VERSION-win-x64-framework/SolidWorksMcp.exe"
+        run: ./build/smoke-test.ps1 -Exe "artifacts/solidworks-mcp-$env:VERSION-win-x64-framework/SolidWorksMcp.exe" -ExpectedVersion $env:VERSION
       - uses: actions/upload-artifact@v7
         with:
           name: solidworks-mcp-${{ env.VERSION }}

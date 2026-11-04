@@ -20,7 +20,7 @@ builder.Services.AddSingleton<SolidWorksSession>();
 builder.Services
     .AddMcpServer(o =>
     {
-        o.ServerInfo = new() { Name = "solidworks-mcp", Version = "0.1.0" };
+        o.ServerInfo = new() { Name = "solidworks-mcp", Version = ServerVersion.Current };
         o.ServerInstructions = ServerInstructions.Text;
     })
     .WithStdioServerTransport()

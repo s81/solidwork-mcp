@@ -1,4 +1,11 @@
-First release of the SolidWorks MCP server for **SolidWorks 2022 or newer** on Windows x64: 81 tools over stdio, built with .NET 8 and the official MCP C# SDK.
+SolidWorks MCP server for **SolidWorks 2022 or newer** on Windows x64: 81 tools over stdio, built with .NET 8 and the official MCP C# SDK.
+
+## What's new in 0.1.1
+
+- **Licence:** the project is MIT-licensed (© 2026 Samer William Al-Haddadin). Each zip now includes `LICENSE.txt` and `THIRD-PARTY-NOTICES.md`, which lists the licences of the bundled MCP SDK, .NET and SolidWorks interop components.
+- **Server version:** the version reported to MCP clients now comes from the build, so it always matches the release. The release smoke test checks this.
+- **Build pipeline:** the GitHub Actions now run on Node 24, and a release can be published from a manual workflow run.
+- The tools are unchanged from 0.1.0.
 
 ## Downloads
 
@@ -23,6 +30,6 @@ Each zip has `SolidWorksMcp.exe`, `INSTALL.md` (setup, settings, troubleshooting
 
 ## Status and limits
 
-- Compiled against the SolidWorks 2022 SP5 API and covered by 409 automated tests. Before every release, each zip is started and the MCP handshake and tool list are checked.
+- Compiled against the SolidWorks 2022 SP5 API and covered by automated tests. Before every release, each zip is started and the MCP handshake, server version and tool list are checked.
 - **Not yet validated against a live SolidWorks session.** Run the README smoke test on a test workstation first.
 - `SolidWorksMcp.exe` is **not code-signed**. Unblock the zip before extracting (see `INSTALL.md`).
