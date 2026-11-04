@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- Lets the project build (and its unit tests run) on Linux/macOS CI. It still only talks to SolidWorks on Windows. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- SolidWorks is 64-bit only; out-of-proc COM works from any bitness, but x64 keeps it predictable. -->
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier Condition="'$(OS)' == 'Windows_NT'">win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>SolidWorksMcp</AssemblyName>
+    <RootNamespace>SolidWorksMcp</RootNamespace>
+    <Version>0.1.0</Version>
+    <!-- Interop assemblies target .NET Framework; they are plain COM type metadata and load fine on .NET 8. -->
+    <NoWarn>$(NoWarn);NU1701</NoWarn>
+  </PropertyGroup>
+
+  <!--
+    SolidWorks interop resolution:
+      1. If SolidWorks is installed (or SolidWorksApiPath is passed), reference the interop DLLs shipped
+         with that installation: <install>\api\redist. This is the officially supported source.
+      2. Otherwise (CI, Linux, dev box without SolidWorks) fall back to the SolidWorks.Interop.* NuGet
+         packages built from SolidWorks 2022 SP5.1. Code compiled against 2022 runs on 2022 and newer.
+  -->
+  <PropertyGroup>
+    <SolidWorksApiPath Condition="'$(SolidWorksApiPath)' == ''">C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\api\redist</SolidWorksApiPath>
+    <UseLocalSolidWorksInterop Condition="'$(UseLocalSolidWorksInterop)' == '' And Exists('$(SolidWorksApiPath)\SolidWorks.Interop.sldworks.dll')">true</UseLocalSolidWorksInterop>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(UseLocalSolidWorksInterop)' == 'true'">
+    <Reference Include="SolidWorks.Interop.sldworks">
+      <HintPath>$(SolidWorksApiPath)\SolidWorks.Interop.sldworks.dll</HintPath>
+      <EmbedInteropTypes>false</EmbedInteropTypes>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="SolidWorks.Interop.swconst">
+      <HintPath>$(SolidWorksApiPath)\SolidWorks.Interop.swconst.dll</HintPath>
+      <EmbedInteropTypes>false</EmbedInteropTypes>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseLocalSolidWorksInterop)' != 'true'">
+    <PackageReference Include="SolidWorks.Interop.sldworks" Version="30.5.1" />
+    <PackageReference Include="SolidWorks.Interop.swconst" Version="30.5.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol" Version="2.3.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SolidWorksMcp.Tests" />
+  </ItemGroup>
+
+</Project>

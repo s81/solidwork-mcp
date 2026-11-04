@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{AA883C6C-6429-42A5-AE69-ABE6C7274114}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SolidWorksMcp", "src\SolidWorksMcp\SolidWorksMcp.csproj", "{5282EBE2-78D3-4921-8F18-F37425E0879B}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{B72C1B50-FBAF-4F2B-A5D5-B4ED830393A3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SolidWorksMcp.Tests", "tests\SolidWorksMcp.Tests\SolidWorksMcp.Tests.csproj", "{18EBBEB7-182C-4D5A-B611-D35B5FE310C6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5282EBE2-78D3-4921-8F18-F37425E0879B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5282EBE2-78D3-4921-8F18-F37425E0879B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5282EBE2-78D3-4921-8F18-F37425E0879B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5282EBE2-78D3-4921-8F18-F37425E0879B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{18EBBEB7-182C-4D5A-B611-D35B5FE310C6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{18EBBEB7-182C-4D5A-B611-D35B5FE310C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{18EBBEB7-182C-4D5A-B611-D35B5FE310C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{18EBBEB7-182C-4D5A-B611-D35B5FE310C6}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{5282EBE2-78D3-4921-8F18-F37425E0879B} = {AA883C6C-6429-42A5-AE69-ABE6C7274114}
+		{18EBBEB7-182C-4D5A-B611-D35B5FE310C6} = {B72C1B50-FBAF-4F2B-A5D5-B4ED830393A3}
+	EndGlobalSection
+EndGlobal
