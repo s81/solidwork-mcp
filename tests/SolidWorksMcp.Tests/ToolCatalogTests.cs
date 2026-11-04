@@ -23,7 +23,7 @@ public class ToolCatalogTests
         {
             "sw_connect", "sw_open_document", "sw_save_document", "sw_export", "sw_batch_export", "sw_export_flat_pattern_dxf",
             "sw_get_custom_properties", "sw_set_custom_property", "sw_get_mass_properties", "sw_get_bom",
-            "sw_create_sketch", "sw_extrude", "sw_cut_extrude", "sw_set_dimension",
+            "sw_create_sketch", "sw_extrude", "sw_cut_extrude", "sw_set_dimension", "sw_revolve", "sw_fillet", "sw_list_edges",
             "sw_create_drawing", "sw_list_drawing_sheets", "sw_run_macro", "sw_set_global_variable",
         })
         {

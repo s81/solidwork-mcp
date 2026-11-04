@@ -28,12 +28,34 @@ public class McpProtocolTests
         Assert.Contains("millimetres", client.ServerInstructions ?? string.Empty);
 
         var tools = await client.ListToolsAsync();
-        Assert.True(tools.Count >= 35, $"only {tools.Count} tools");
+        Assert.True(tools.Count >= 44, $"only {tools.Count} tools");
         var sketch = tools.Single(t => t.Name == "sw_create_sketch");
         string schema = sketch.JsonSchema.GetRawText();
         Assert.Contains("\"entities\"", schema);
         Assert.Contains("\"radius\"", schema, StringComparison.OrdinalIgnoreCase);
         Assert.True(tools.Single(t => t.Name == "sw_list_open_documents").ProtocolTool.Annotations?.ReadOnlyHint);
+    }
+
+    [Fact]
+    public async Task FilletSchemaAcceptsPointArrays()
+    {
+        await using var client = await StartAsync();
+        var fillet = (await client.ListToolsAsync()).Single(t => t.Name == "sw_fillet");
+        var points = fillet.JsonSchema.GetProperty("properties").GetProperty("points");
+        Assert.Contains("array", points.GetRawText());
+        Assert.Contains("number", points.GetRawText());
+    }
+
+    [Theory]
+    [InlineData("sw_fillet", "radius", 0.0, "radius must be > 0")]
+    [InlineData("sw_revolve", "angleDegrees", 400.0, "angleDegrees must be")]
+    public async Task FeatureToolsValidateBeforeTouchingSolidWorks(string tool, string arg, double value, string expected)
+    {
+        await using var client = await StartAsync();
+        var args = new Dictionary<string, object?> { [arg] = value, ["sketch"] = "Sketch1", ["selection"] = "all" };
+        var result = await client.CallToolAsync(tool, args);
+        Assert.True(result.IsError);
+        Assert.Contains(expected, Text(result));
     }
 
     [Fact]
